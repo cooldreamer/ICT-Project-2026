@@ -1,0 +1,12 @@
+# Optional speech-to-text backend
+faster-whisper>=1.0
+
+# Optional wake-word detection runtime (a separate compatible model file is required)
+openwakeword>=0.6
+
+# Optional loader for a user-trained accent classifier
+joblib>=1.3
+scikit-learn>=1.3
+
+# Optional dataset preparation/training utility for the accent-model adapter
+pandas>=2.0
