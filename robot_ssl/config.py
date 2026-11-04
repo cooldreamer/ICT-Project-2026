@@ -15,11 +15,11 @@ DEFAULT_MIC_POSITIONS: Tuple[Tuple[float, float], ...] = (
     (-0.05, 0.05),
 )
 
-
+# to do: add config json file which is read in by python file
 @dataclass
 class AppConfig:
     sample_rate: int = 16_000
-    channels: int = 4
+    # NOT NEEDED since mic geometry defines this #channels: int = 4
     frame_samples: int = 1_280  # 80 ms at 16 kHz; matches openWakeWord frame sizing
     microphone_positions_m: Tuple[Tuple[float, float], ...] = DEFAULT_MIC_POSITIONS
     speed_of_sound_m_s: float = 343.0
@@ -62,13 +62,13 @@ class AppConfig:
             )
         if self.frame_samples <= 0:
             raise ValueError("frame_samples must be a positive integer")
-        if self.channels < 1:
-            raise ValueError("channels must be at least 1")
-        if self.channels != len(self.microphone_positions_m):
-            raise ValueError(
-                f"Configured {self.channels} input channels but have "
-                f"{len(self.microphone_positions_m)} microphone positions. "
-                "Set --channels and/or supply --mic-geometry to match the device."
-            )
+        if len(self.microphone_positions_m) < 1:
+            raise ValueError("at least one input must be preset")
+        # if self.channels != len(self.microphone_positions_m):
+        #     raise ValueError(
+        #         f"Configured {self.channels} input channels but have "
+        #         f"{len(self.microphone_positions_m)} microphone positions. "
+        #         "Set --channels and/or supply --mic-geometry to match the device."
+        #    )
         if self.doa_step_degrees <= 0:
             raise ValueError("doa_step_degrees must be positive")

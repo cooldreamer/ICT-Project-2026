@@ -18,10 +18,11 @@ from robot_ssl.audio.localization import SRPPHATLocalizer
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Robot sound source localisation, wake-word, and speech attention pipeline")
     parser.add_argument("--device", help="Input device index (run --list-devices to inspect devices)")
-    parser.add_argument("--channels", type=int, default=4, help="Input channels; must match the connected microphone array")
+    parser.add_argument("--use-general-mic-model", default="true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
+    # NOT NEEDED since mic geometry defines this #parser.add_argument("--channels", type=int, default=AppConfig.channels, help="Mic channels; must match the connected microphone array (under XVF3800, 2 channels have total audio/DoA data so two less than the total channels is assumed)")
     parser.add_argument("--mic-geometry", help="JSON file containing microphone positions in metres, channel order; format: [[x,y], ...]")
     parser.add_argument("--wakeword-model", help="Path to an openWakeWord ONNX/TFLite model; if omitted, transcript wake phrases are used")
-    parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases")
+    parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases") # what does this mean
     parser.add_argument("--stt-model", default="base", help="faster-whisper model size/path (e.g. tiny, base, small)")
     parser.add_argument("--stt-device", default="cpu", choices=("cpu", "cuda"), help="faster-whisper inference device")
     parser.add_argument("--stt-compute-type", default="int8", help="faster-whisper compute type, e.g. int8 or float16")
@@ -51,7 +52,7 @@ def load_geometry(path: str | None, channels: int) -> tuple[tuple[float, float],
             )
     if len(positions) != channels or any(len(point) != 2 for point in positions):
         raise ValueError("Microphone geometry must contain exactly one [x, y] pair per input channel")
-    return positions
+    return positions # type: ignore
 
 
 def list_audio_devices() -> None:
@@ -111,7 +112,7 @@ def main() -> int:
     if isinstance(device, str) and device.isdigit():
         device = int(device)
     config = AppConfig(
-        channels=args.channels,
+        #channels=args.channels,
         microphone_positions_m=positions,
         wakeword_model_path=args.wakeword_model,
         stt_model=args.stt_model,

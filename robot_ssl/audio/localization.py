@@ -11,7 +11,7 @@ class LocalizationResult:
     confidence: float
     scores: np.ndarray
 
-
+# Note: This should be replaced with the thereSpeaker SVF3800's DoA detection
 class SRPPHATLocalizer:
     """Estimate horizontal direction of arrival using phase-normalised cross spectra.
 

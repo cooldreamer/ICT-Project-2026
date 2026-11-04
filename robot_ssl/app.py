@@ -114,7 +114,10 @@ class RobotAudioApp:
         lowered = re.sub(r"[^a-z0-9\s]", " ", text.lower())
         lowered = re.sub(r"\s+", " ", lowered).strip()
         return any(re.search(rf"\b{re.escape(phrase)}\b", lowered) for phrase in self.wake_phrases)
-
+    
+    # To Do: 
+    # * Separate first/second and third-sixth channels for DoA and wakeword detection
+    # * Replace direct sounddevice interface with specialised reSpeaker XVF3800 interface library
     def run(self) -> None:
         try:
             import sounddevice as sd
@@ -131,6 +134,7 @@ class RobotAudioApp:
         })
 
         try:
+            print("# channels:", self.config.channels)
             with sd.InputStream(
                 samplerate=self.config.sample_rate,
                 channels=self.config.channels,

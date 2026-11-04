@@ -15,6 +15,7 @@ class WakeWordDetector:
         if model_path:
             try:
                 from openwakeword.model import Model
+                print("I have model!!!")
             except ImportError as exc:
                 raise RuntimeError(
                     "A wake-word model path was supplied. Install the optional dependency with: pip install openwakeword"
