@@ -22,7 +22,11 @@ class AppConfig:
     # NOT NEEDED since mic geometry defines this #channels: int = 4
     frame_samples: int = 1_280  # 80 ms at 16 kHz; matches openWakeWord frame sizing
     microphone_positions_m: Tuple[Tuple[float, float], ...] = DEFAULT_MIC_POSITIONS
-    speed_of_sound_m_s: float = 343.0
+    
+    # speed of sound in Canberra at average elevation (570 m) and mean max temperature in November (23.5 C)
+    # (this should be changed depending on your circumstances)
+    speed_of_sound_m_s: float = 345.18
+    
     
     doa_step_degrees: float = 2.0
     vad_min_rms: float = 0.004
