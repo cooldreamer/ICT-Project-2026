@@ -1,6 +1,6 @@
 # Robot Sound Source Localisation & Attention (Python)
 
-A modular starter implementation of the requested robot audio-perception pipeline. It combines synchronised multichannel audio capture, SRP-PHAT-style direction-of-arrival (DoA) estimation, a delay-and-sum beamformer, optional wake-word ML, local speech-to-text, acoustic speech characteristics, an attention-session tracker, a robot movement adapter, optional server event forwarding, SQLite metadata storage, health counters, and a Tkinter dashboard.
+An implementation of the requested robot audio-perception pipeline. It combines synchronised multichannel audio capture, SRP-PHAT-style direction-of-arrival (DoA) estimation, a delay-and-sum beamformer, optional wake-word ML, local speech-to-text, acoustic speech characteristics, an attention-session tracker, a robot movement adapter, optional server event forwarding, SQLite metadata storage, health counters, and a Tkinter dashboard.
 
 ## 1. Pipeline overview
 
