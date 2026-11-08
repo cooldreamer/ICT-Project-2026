@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from os import name
 from pathlib import Path
 from typing import Tuple
 import warnings
+import json
+import functools
 
 # Robot-relative microphone coordinates in metres: (forward, left).
 # This default is a square 10 cm array. Replace it with measured coordinates for
@@ -26,6 +29,8 @@ XVF3800_MIC_POSITIONS: Tuple[Tuple[float, float], ...] = (
 XVF3800_INPUT_CHANNELS = 6
 XVF3800_MIC_CHANNEL_INDICES: Tuple[int, ...] = (2, 3, 4, 5) # indexed from 0
 
+property_connections = {} # global isn't ideal here but eh
+
 # to do: add config json file which is read in by python file
 @dataclass
 class AppConfig:
@@ -37,10 +42,7 @@ class AppConfig:
     _microphone_positions_m: Tuple[Tuple[float, float], ...] = DEFAULT_MIC_POSITIONS
     _microphone_channel_indices: Tuple[int, ...] = (0, 1, 2, 3)
     
-    # speed of sound in Canberra at average elevation (570 m) and mean max temperature in November (23.5 C)
-    # (this should be changed depending on your circumstances)
-    speed_of_sound_m_s: float = 345.18
-    
+    speed_of_sound_m_s: float = 340.0
     
     doa_step_degrees: float = 2.0
     vad_min_rms: float = 0.004
@@ -74,26 +76,77 @@ class AppConfig:
     discovery_server_host = robot_hostname
     ros_domain_id = "9"
     
+    def swap_with_xvf3800_check(_func: function | None = None, *, attributename=None, xvfname=None):
+        global property_connections
+        def decorator(func):
+            property_connections[func.__name__] = attributename
+            #print(property_connections)
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                func(*args, **kwargs)
+                return globals()[xvfname] if self.use_xvf3800_mic_model else getattr(self, attributename)
+            return wrapper
+        
+        if callable(_func):
+            #print(_func.__name__)
+            #AppConfig.property_connections[_func.__name__] = attributename
+            return decorator(_func)
+        
+        #AppConfig.property_connections[_func.__name__] = attributename
+        return decorator
+    
     @property
     def channels(self):
         # Compatibility alias for the number of geometry microphone channels.
         return len(self.microphone_positions_m)
 
     @property
+    @swap_with_xvf3800_check(attributename="_input_channels")
     def input_channels(self):
-        return XVF3800_INPUT_CHANNELS if self.use_xvf3800_mic_model else self._input_channels
+        return# XVF3800_INPUT_CHANNELS if self.use_xvf3800_mic_model else self._input_channels
     
     @property
+    @swap_with_xvf3800_check(attributename="_sample_rate")
     def sample_rate(self):
         return 16_000 if self.use_xvf3800_mic_model else self._sample_rate
     
     @property
+    @swap_with_xvf3800_check(attributename="_microphone_positions_m")
     def microphone_positions_m(self):
         return XVF3800_MIC_POSITIONS if self.use_xvf3800_mic_model else self._microphone_positions_m
 
     @property
+    @swap_with_xvf3800_check(attributename="_microphone_channel_indices")
     def microphone_channel_indices(self):
         return XVF3800_MIC_CHANNEL_INDICES if self.use_xvf3800_mic_model else self._microphone_channel_indices
+    
+    def __init__(self):
+        json_settings = self.load_json()
+        if json_settings:
+            # to do: change keys with names of properties to their respective attributes
+            properties = [key for key, value in type(self).__dict__.items() if isinstance(value, property)]
+            print((type(self).__dict__["channels"]).fget.__name__)
+            # cool script but doesn't work because I can't just assume the property automatically returns the private var lol; the above just "finds" the property name again
+            print([(propname, (type(self).__dict__[propname]).fget.__name__) for propname in properties])
+            print("jfgfjghhjgg")
+            print(self.input_channels)
+            
+            # Note: the way this is loaded, the last entry to share the name of an attribute will be ultimately used
+            dir_self = dir(self)
+            for setting_name, setting_val in [(a,b) for a,b in json_settings.items() if a in dir_self]:
+                setattr(self, setting_name, setting_val)
+        
+        return
+        
+    def load_json(self):
+        json_settings = {}
+        try:
+            with open("config.json") as json_file:
+                json_settings = json.load(json_file)
+        except FileNotFoundError:
+            pass
+        
+        return json_settings
 
     def validate(self) -> None:
         if self.sample_rate != 16_000:
@@ -116,3 +169,6 @@ class AppConfig:
         
         if self.doa_step_degrees <= 0:
             raise ValueError("doa_step_degrees must be positive")
+
+if __name__ == "__main__":
+    AppConfig()
