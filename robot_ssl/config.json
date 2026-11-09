@@ -1,7 +1,6 @@
 {
     "use_xvf3800_mic_model": true, 
     
-    
     "speed_of_sound_m_s": 345.18,
     "_note_about_speed_of_sound": "speed of sound in Canberra at average elevation (570 m) and mean max temperature in November (23.5 C)",
 

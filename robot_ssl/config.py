@@ -133,17 +133,14 @@ class AppConfig:
         print(dir(self))
         print(self.microphone_channel_indices)
         if json_settings:
-            # to do: change keys with names of properties to their respective attributes
-            #properties = [key for key, value in type(self).__dict__.items() if isinstance(value, property)]
-            #print((type(self).__dict__["channels"]).fget.__name__)
-            # cool script but doesn't work because I can't just assume the property automatically returns the private var lol; the above just "finds" the property name again
-            #print([(propname, (type(self).__dict__[propname]).fget.__name__) for propname in properties])
-            #print("jfgfjghhjgg")
-            #print(self.input_channels)
+            # Replace property JSON entries with attribute JSON entries, to preserve property behaviour correctly
+            json_settings = dict([(f"_{key}" if key in self.property_connections else key, value) for key, value in json_settings.items()])
+            print(json_settings)
             
-            # wtf am i doing
+            # Load JSON settings into AppConfig attributes
+            # (Note 1: the way this is loaded, the last entry to share the name of an attribute will be ultimately used)
+            # (Note 2: since this is done in __post_init__, the JSON settings will override any values set in the constructor)
             
-            # Note: the way this is loaded, the last entry to share the name of an attribute will be ultimately used
             dir_self = dir(self)
             for setting_name, setting_val in [(a,b) for a,b in json_settings.items() if a in dir_self]:
                 setattr(self, setting_name, setting_val)
