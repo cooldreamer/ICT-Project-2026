@@ -27,9 +27,8 @@ XVF3800_MIC_POSITIONS: Tuple[Tuple[float, float], ...] = (
 )
 
 XVF3800_INPUT_CHANNELS = 6
+XVF3800_SAMPLE_RATE = 16_000
 XVF3800_MIC_CHANNEL_INDICES: Tuple[int, ...] = (2, 3, 4, 5) # indexed from 0
-
-property_connections = {} # global isn't ideal here but eh
 
 # to do: add config json file which is read in by python file
 @dataclass
@@ -41,6 +40,8 @@ class AppConfig:
     _input_channels: int = 4
     _microphone_positions_m: Tuple[Tuple[float, float], ...] = DEFAULT_MIC_POSITIONS
     _microphone_channel_indices: Tuple[int, ...] = (0, 1, 2, 3)
+    
+    property_connections = {"input_channels": "XVF3800_INPUT_CHANNELS", "sample_rate": "XVF3800_SAMPLE_RATE", "microphone_positions_m": "XVF3800_MIC_POSITIONS", "microphone_channel_indices": "XVF3800_MIC_CHANNEL_INDICES"}
     
     speed_of_sound_m_s: float = 340.0
     
@@ -76,60 +77,71 @@ class AppConfig:
     discovery_server_host = robot_hostname
     ros_domain_id = "9"
     
-    def swap_with_xvf3800_check(_func: function | None = None, *, attributename=None, xvfname=None):
-        global property_connections
-        def decorator(func):
-            property_connections[func.__name__] = attributename
-            #print(property_connections)
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                func(*args, **kwargs)
-                return globals()[xvfname] if self.use_xvf3800_mic_model else getattr(self, attributename)
-            return wrapper
+    # def swap_with_xvf3800_check(_func: function | None = None, *, attributename=None, xvfname=None):
+    #     global property_connections
+    #     def decorator(func):
+    #         property_connections[func.__name__] = attributename
+    #         #print(property_connections)
+    #         @functools.wraps(func)
+    #         def wrapper(*args, **kwargs):
+    #             func(*args, **kwargs)
+    #             return globals()[xvfname] if self.use_xvf3800_mic_model else getattr(self, attributename)
+    #         return wrapper
         
-        if callable(_func):
-            #print(_func.__name__)
-            #AppConfig.property_connections[_func.__name__] = attributename
-            return decorator(_func)
+    #     if callable(_func):
+    #         #print(_func.__name__)
+    #         #AppConfig.property_connections[_func.__name__] = attributename
+    #         return decorator(_func)
         
-        #AppConfig.property_connections[_func.__name__] = attributename
-        return decorator
+    #     #AppConfig.property_connections[_func.__name__] = attributename
+    #     return decorator
     
-    @property
-    def channels(self):
-        # Compatibility alias for the number of geometry microphone channels.
-        return len(self.microphone_positions_m)
+    # This one we'll have to set manually
+    # @property
+    # def channels(self):
+    #     # Compatibility alias for the number of geometry microphone channels.
+    #     return len(self.microphone_positions_m)
+    
+    # @property
+    # # @swap_with_xvf3800_check(attributename="_sample_rate")
+    # def sample_rate(self):
+    #     return 16_000 if self.use_xvf3800_mic_model else self._sample_rate
+    
+    # @property
+    # # @swap_with_xvf3800_check(attributename="_microphone_positions_m")
+    # def microphone_positions_m(self):
+    #     return XVF3800_MIC_POSITIONS if self.use_xvf3800_mic_model else self._microphone_positions_m
 
-    @property
-    @swap_with_xvf3800_check(attributename="_input_channels")
-    def input_channels(self):
-        return# XVF3800_INPUT_CHANNELS if self.use_xvf3800_mic_model else self._input_channels
+    # @property
+    # # # @swap_with_xvf3800_check(attributename="_microphone_channel_indices")
+    # def microphone_channel_indices(self):
+    #     return XVF3800_MIC_CHANNEL_INDICES if self.use_xvf3800_mic_model else self._microphone_channel_indices
     
-    @property
-    @swap_with_xvf3800_check(attributename="_sample_rate")
-    def sample_rate(self):
-        return 16_000 if self.use_xvf3800_mic_model else self._sample_rate
+    # property variables, to make interpreter shut up.  These values are all replaced immediately (in __post_init__)
+    sample_rate = 0
+    input_channels = 0
+    microphone_positions_m = ()
+    microphone_channel_indices = ()
     
-    @property
-    @swap_with_xvf3800_check(attributename="_microphone_positions_m")
-    def microphone_positions_m(self):
-        return XVF3800_MIC_POSITIONS if self.use_xvf3800_mic_model else self._microphone_positions_m
-
-    @property
-    @swap_with_xvf3800_check(attributename="_microphone_channel_indices")
-    def microphone_channel_indices(self):
-        return XVF3800_MIC_CHANNEL_INDICES if self.use_xvf3800_mic_model else self._microphone_channel_indices
+    channels = 0
     
-    def __init__(self):
+    def __post_init__(self):
+        self.load_properties() # interpreter hates this but it works
+        self.channels = property(lambda self: len(self.microphone_positions_m))
+        
         json_settings = self.load_json()
+        print(dir(self))
+        print(self.microphone_channel_indices)
         if json_settings:
             # to do: change keys with names of properties to their respective attributes
-            properties = [key for key, value in type(self).__dict__.items() if isinstance(value, property)]
-            print((type(self).__dict__["channels"]).fget.__name__)
+            #properties = [key for key, value in type(self).__dict__.items() if isinstance(value, property)]
+            #print((type(self).__dict__["channels"]).fget.__name__)
             # cool script but doesn't work because I can't just assume the property automatically returns the private var lol; the above just "finds" the property name again
-            print([(propname, (type(self).__dict__[propname]).fget.__name__) for propname in properties])
-            print("jfgfjghhjgg")
-            print(self.input_channels)
+            #print([(propname, (type(self).__dict__[propname]).fget.__name__) for propname in properties])
+            #print("jfgfjghhjgg")
+            #print(self.input_channels)
+            
+            # wtf am i doing
             
             # Note: the way this is loaded, the last entry to share the name of an attribute will be ultimately used
             dir_self = dir(self)
@@ -147,6 +159,11 @@ class AppConfig:
             pass
         
         return json_settings
+    
+    def load_properties(self):
+        for setting_name, setting_val in [(a,b) for a,b in self.property_connections.items() if a in dir(self)]:
+            setattr(self, setting_name, property(lambda self: globals()[setting_val] if self.use_xvf3800_mic_model else getattr(self, f"_{setting_name}")))
+        return
 
     def validate(self) -> None:
         if self.sample_rate != 16_000:
@@ -155,8 +172,8 @@ class AppConfig:
         if self.frame_samples <= 0:
             raise ValueError("frame_samples must be a positive integer")
         
-        if len(self.microphone_positions_m) < 1:
-            raise ValueError("at least one input must be preset")
+        if len(self.microphone_positions_m) < 1: # type: ignore
+            raise ValueError("At least one input must be present")
         
         if self.input_channels < 1:
             raise ValueError("input_channels must be at least 1")
