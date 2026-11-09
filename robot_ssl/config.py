@@ -77,25 +77,6 @@ class AppConfig:
     discovery_server_host = robot_hostname
     ros_domain_id = "9"
     
-    # def swap_with_xvf3800_check(_func: function | None = None, *, attributename=None, xvfname=None):
-    #     global property_connections
-    #     def decorator(func):
-    #         property_connections[func.__name__] = attributename
-    #         #print(property_connections)
-    #         @functools.wraps(func)
-    #         def wrapper(*args, **kwargs):
-    #             func(*args, **kwargs)
-    #             return globals()[xvfname] if self.use_xvf3800_mic_model else getattr(self, attributename)
-    #         return wrapper
-        
-    #     if callable(_func):
-    #         #print(_func.__name__)
-    #         #AppConfig.property_connections[_func.__name__] = attributename
-    #         return decorator(_func)
-        
-    #     #AppConfig.property_connections[_func.__name__] = attributename
-    #     return decorator
-    
     # This one we'll have to set manually
     # @property
     # def channels(self):
@@ -130,17 +111,13 @@ class AppConfig:
         self.channels = property(lambda self: len(self.microphone_positions_m))
         
         json_settings = self.load_json()
-        print(dir(self))
-        print(self.microphone_channel_indices)
         if json_settings:
             # Replace property JSON entries with attribute JSON entries, to preserve property behaviour correctly
             json_settings = dict([(f"_{key}" if key in self.property_connections else key, value) for key, value in json_settings.items()])
-            print(json_settings)
             
             # Load JSON settings into AppConfig attributes
             # (Note 1: the way this is loaded, the last entry to share the name of an attribute will be ultimately used)
             # (Note 2: since this is done in __post_init__, the JSON settings will override any values set in the constructor)
-            
             dir_self = dir(self)
             for setting_name, setting_val in [(a,b) for a,b in json_settings.items() if a in dir_self]:
                 setattr(self, setting_name, setting_val)
