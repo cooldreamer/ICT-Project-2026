@@ -1,10 +1,12 @@
-import struct
-import time
+import struct # for neat structuring of binary data
+import time # for delaying the main loop (just time.sleep())
+import traceback # for printing the full traceback of exceptions
 
-import libusb_package
-import usb
-import traceback
+ # for the efficient and safe handling of USB device connections
+import libusb_package # Windows (a wrapper for libusb, a C library that provides generic access to USB devices)
+import usb # Mac/Linux (pyusb, a Python library that provides easy access to USB devices)
 
+# Project config settings (for microphone array, etc.)
 # If the script is run directly, it cannot natively access the config module; adjustmust to the import path is needed to include the parent directory
 # (Note: Since this is a test script using an alternative method for reading the microphone array, we do not want to import the full robot app module)
 if __name__ == "__main__":

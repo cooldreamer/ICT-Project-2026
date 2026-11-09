@@ -1,0 +1,1 @@
+* Add comments throughout repository, for better understanding

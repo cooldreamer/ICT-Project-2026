@@ -127,10 +127,10 @@ class AppConfig:
     def load_json(self):
         json_settings = {}
         try:
-            with open("config.json") as json_file:
+            with open("robot_ssl/config.json") as json_file:
                 json_settings = json.load(json_file)
         except FileNotFoundError:
-            pass
+            print("JSON config file not found.  Using input or default settings.")
         
         return json_settings
     
