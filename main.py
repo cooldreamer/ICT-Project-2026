@@ -16,6 +16,15 @@ from robot_ssl.audio.localization import SRPPHATLocalizer
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for capture, models, and integrations.
+
+    Input channel configuration is derived from the microphone geometry rather
+    than a separate channel-count option; the XVF3800 exposes additional
+    non-microphone channels that require device-specific routing.
+
+    Returns:
+        The parsed command-line arguments.
+    """
     parser = argparse.ArgumentParser(description="Robot sound source localisation, wake-word, and speech attention pipeline")
     parser.add_argument("--device", help="Input device index (run --list-devices to inspect devices)")
     parser.add_argument("--use-general-mic-model", default="true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
@@ -38,6 +47,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_geometry(path: str | None, channels: int) -> tuple[tuple[float, float], ...]:
+    """Load or select microphone coordinates and verify their channel count.
+
+    Parameters:
+        * path : Optional JSON file containing microphone coordinate pairs.
+        * channels : Number of microphone channels to configure.
+
+    Returns:
+        Microphone positions as ``(x, y)`` coordinate pairs.
+
+    Raises:
+        ValueError: If no default geometry exists for the channel count or the
+            supplied geometry does not match it.
+    """
     if path:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
         positions = tuple(tuple(float(value) for value in pair) for pair in raw)
@@ -56,6 +78,14 @@ def load_geometry(path: str | None, channels: int) -> tuple[tuple[float, float],
 
 
 def list_audio_devices() -> None:
+    """Print audio devices available through sounddevice.
+
+    Raises:
+        RuntimeError: If ``sounddevice`` is not installed.
+
+    Returns:
+        None.
+    """
     try:
         import sounddevice as sd
     except ImportError as exc:
@@ -64,7 +94,15 @@ def list_audio_devices() -> None:
 
 
 def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
-    """Synthesize a broadband signal at +40° and print estimated azimuth."""
+    """Synthesize a broadband signal at +40° and print estimated azimuth.
+
+    Parameters:
+        * positions : Microphone coordinate pairs in metres.
+
+    Returns:
+        Process status: 0 for a sufficiently accurate estimate, 1 for a failed
+        or inaccurate estimate, or 2 if fewer than two microphones are given.
+    """
     if len(positions) < 2:
         print("DoA demo needs at least 2 microphone positions; use 3+ non-collinear microphones for best results.")
         return 2
@@ -95,6 +133,11 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
 
 
 def main() -> int:
+    """Run the demo, device listing, or configured audio-perception application.
+
+    Returns:
+        The demo status, or 0 after the application exits normally.
+    """
     args = parse_args()
     logging.basicConfig(
         level=getattr(logging, args.log_level),

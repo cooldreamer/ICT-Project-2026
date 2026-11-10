@@ -1,13 +1,11 @@
-"""Configuration for the robot audio perception pipeline."""
-from __future__ import annotations
+"""Module managing configuration settings for the whole project.
+Includes definitions for default/XVF3800-specific values and the managing AppConfig class."""
 
-from dataclasses import dataclass, field
-from os import name
-from pathlib import Path
-from typing import Tuple
-import warnings
-import json
-import functools
+from dataclasses import dataclass # for templating of the configuration module into an attribute-centred class
+from pathlib import Path # for storing the path to the sqlite database
+from typing import Tuple # for type declaration of variables as a Tuple
+import warnings # for raising warnings for less critical issues in the project's operation
+import json # for loading and reading a json file into a dictionary
 
 # Robot-relative microphone coordinates in metres: (forward, left).
 # This default is a square 10 cm array. Replace it with measured coordinates for
@@ -19,6 +17,7 @@ DEFAULT_MIC_POSITIONS: Tuple[Tuple[float, float], ...] = (
     (-0.05, 0.05),
 )
 
+# Default settings correct for the XVF3800 mic array.  Otherwise like DEFAULT_MIC_POSITIONS.
 XVF3800_MIC_POSITIONS: Tuple[Tuple[float, float], ...] = (
     (0.05, 0.05),
     (0.05, -0.05),
@@ -30,9 +29,21 @@ XVF3800_INPUT_CHANNELS = 6
 XVF3800_SAMPLE_RATE = 16_000
 XVF3800_MIC_CHANNEL_INDICES: Tuple[int, ...] = (2, 3, 4, 5) # indexed from 0
 
-# to do: add config json file which is read in by python file
 @dataclass
 class AppConfig:
+    """Class managing the configuration settings for the whole project.
+
+    Device-specific values come from module constants when the XVF3800 profile
+    is enabled. Otherwise, underscored fields provide the defaults. Settings
+    from ``robot_ssl/config.json`` are applied after construction and override
+    constructor-provided values with matching names. Device-dependent
+    properties are installed dynamically during initialization.
+
+    Microphone coordinates are example values and must be replaced with
+    measurements for the physical array. Non-16-kHz audio is not resampled;
+    wake-word inference expects 16 kHz.
+    """
+
     use_xvf3800_mic_model: bool = True # overrides other settings if True
     
     # these properties are ignored if use_xvf3800_mic_model is True
@@ -107,6 +118,11 @@ class AppConfig:
     channels = 0
     
     def __post_init__(self):
+        """Install device-dependent properties and apply JSON overrides.
+
+        Returns:
+            None.
+        """
         self.load_properties() # interpreter hates this but it works
         self.channels = property(lambda self: len(self.microphone_positions_m))
         
@@ -125,6 +141,11 @@ class AppConfig:
         return
         
     def load_json(self):
+        """Load settings from ``robot_ssl/config.json`` if it exists.
+
+        Returns:
+            The settings dictionary, or an empty dictionary if the file is missing.
+        """
         json_settings = {}
         try:
             with open("robot_ssl/config.json") as json_file:
@@ -135,11 +156,31 @@ class AppConfig:
         return json_settings
     
     def load_properties(self):
+        """Bind device-dependent settings to the active microphone profile.
+
+        With the XVF3800 profile enabled, public settings read from module constants.
+        Otherwise, they read from their underscored instance fields.
+
+        Returns:
+            None.
+        """
         for setting_name, setting_val in [(a,b) for a,b in self.property_connections.items() if a in dir(self)]:
             setattr(self, setting_name, property(lambda self: globals()[setting_val] if self.use_xvf3800_mic_model else getattr(self, f"_{setting_name}")))
         return
 
     def validate(self) -> None:
+        """Validate microphone and processing settings.
+
+        Raises:
+            ValueError: If the frame size, microphone/channel configuration,
+                or DoA angular step is invalid.
+
+        Warns:
+            UserWarning: If the sample rate is not 16 kHz.
+
+        Returns:
+            None.
+        """
         if self.sample_rate != 16_000:
             # To do: add a resampler to the pipeline so that openWakeWord can be used with other sample rates
             warnings.warn("openWakeWord expects 16 kHz audio.  If an openWakeWord model is being used, this will not work!", UserWarning)

@@ -27,6 +27,14 @@ from robot_ssl.services.storage import DatabaseStore
 
 
 def circular_mean_degrees(angles: list[float]) -> float | None:
+    """Calculate the circular mean of angles in degrees.
+
+    Parameters:
+        * angles : Angles in degrees to average.
+
+    Returns:
+        The mean angle in degrees, or ``None`` if ``angles`` is empty.
+    """
     if not angles:
         return None
     radians = np.deg2rad(np.asarray(angles, dtype=np.float64))
@@ -38,6 +46,13 @@ def circular_mean_degrees(angles: list[float]) -> float | None:
 
 
 class RobotAudioApp:
+    """Coordinate audio capture, speech processing, attention, and integrations.
+
+    Audio currently enters through ``sounddevice``. A device-specific XVF3800
+    interface and explicit channel routing for DoA and wake-word processing are
+    future integration work.
+    """
+
     def __init__(
         self,
         config: AppConfig,
@@ -46,6 +61,18 @@ class RobotAudioApp:
         device: int | str | None = None,
         wake_phrases: tuple[str, ...] = ("hey robot", "hello robot", "robot"),
     ) -> None:
+        """Initialize the pipeline components from configuration and options.
+
+        Parameters:
+            * config : Validated application settings.
+            * event_queue : Optional queue for UI events and telemetry.
+            * stop_event : Optional event used to request pipeline shutdown.
+            * device : Optional sounddevice input device index or name.
+            * wake_phrases : Transcript phrases recognized as wake words.
+
+        Returns:
+            None.
+        """
         config.validate()
         self.config = config
         self.event_queue = event_queue
@@ -98,6 +125,14 @@ class RobotAudioApp:
         self.last_ui_publish = 0.0
 
     def _publish(self, event: dict[str, Any]) -> None:
+        """Publish an event to the optional UI queue without blocking capture.
+
+        Parameters:
+            * event : Event dictionary to publish.
+
+        Returns:
+            None.
+        """
         if self.event_queue is not None:
             try:
                 self.event_queue.put_nowait(event)
@@ -111,6 +146,14 @@ class RobotAudioApp:
                     pass
 
     def _has_text_wakeword(self, text: str) -> bool:
+        """Check whether transcript text contains a configured wake phrase.
+
+        Parameters:
+            * text : Transcribed speech to search.
+
+        Returns:
+            ``True`` if a configured phrase is present; otherwise, ``False``.
+        """
         lowered = re.sub(r"[^a-z0-9\s]", " ", text.lower())
         lowered = re.sub(r"\s+", " ", lowered).strip()
         return any(re.search(rf"\b{re.escape(phrase)}\b", lowered) for phrase in self.wake_phrases)
@@ -119,6 +162,16 @@ class RobotAudioApp:
     # * Separate first/second and third-sixth channels for DoA and wakeword detection
     # * Replace direct sounddevice interface with specialised reSpeaker XVF3800 interface library
     def run(self) -> None:
+        """Capture microphone frames and enqueue completed speech segments.
+
+        Returns:
+            None.
+
+        Raises:
+            RuntimeError: If the ``sounddevice`` dependency is unavailable.
+            Exception: If audio capture or processing fails; the original error
+                is logged, published, and re-raised.
+        """
         try:
             import sounddevice as sd
         except ImportError as exc:
@@ -206,6 +259,11 @@ class RobotAudioApp:
             self.robot.set_alertness("idle", "audio perception stopped")
 
     def _segment_worker(self) -> None:
+        """Load optional speech models and process queued segments until shutdown.
+
+        Returns:
+            None.
+        """
         stt = SpeechToText(
             model_size=self.config.stt_model,
             device=self.config.stt_device,
@@ -231,6 +289,16 @@ class RobotAudioApp:
                 self.segment_queue.task_done()
 
     def _handle_segment(self, segment: AudioSegment, stt: SpeechToText, accent_classifier: AccentClassifier) -> None:
+        """Analyze an utterance, update attention, and publish its event.
+
+        Parameters:
+            * segment : Captured utterance with audio and localization data.
+            * stt : Speech-to-text backend used for transcription.
+            * accent_classifier : Optional classifier for acoustic traits.
+
+        Returns:
+            None.
+        """
         angle = circular_mean_degrees(segment.doa_angles_degrees)
         confidence = float(np.mean(segment.doa_confidences)) if segment.doa_confidences else 0.0
         if confidence < 0.02:

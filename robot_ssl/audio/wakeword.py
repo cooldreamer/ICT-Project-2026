@@ -6,7 +6,23 @@ import numpy as np
 
 
 class WakeWordDetector:
+    """Optional openWakeWord adapter with threshold and cooldown handling."""
+
     def __init__(self, model_path: str | None, threshold: float = 0.5, cooldown_seconds: float = 2.0) -> None:
+        """Load a wake-word model when a model path is provided.
+
+        Parameters:
+            * model_path : Optional ONNX or TFLite model path.
+            * threshold : Minimum model score required to trigger.
+            * cooldown_seconds : Minimum time between wake-word triggers.
+
+        Returns:
+            None.
+
+        Raises:
+            RuntimeError: If a model path is provided but ``openwakeword`` is
+                not installed.
+        """
         self.threshold = threshold
         self.cooldown_seconds = cooldown_seconds
         self.last_trigger = 0.0
@@ -26,10 +42,23 @@ class WakeWordDetector:
 
     @property
     def enabled(self) -> bool:
+        """Check whether a wake-word model is ready for inference.
+
+        Returns:
+            ``True`` if a model is loaded; otherwise, ``False``.
+        """
         return self.model is not None
 
     def detect(self, mono_audio: np.ndarray) -> tuple[bool, float]:
-        """Consume one mono float frame and return (triggered, best model score)."""
+        """Run wake-word detection on a mono audio frame.
+
+        Parameters:
+            * mono_audio : Mono float audio samples for detection.
+
+        Returns:
+            A pair containing whether a threshold-crossing trigger occurred and
+            the highest model score for this input.
+        """
         if self.model is None:
             return False, 0.0
         mono = np.asarray(mono_audio, dtype=np.float32).reshape(-1)

@@ -1,3 +1,5 @@
+"""Test file for communication with the reSpeaker XVF3800 microphone array using libusb/pyusb."""
+
 import struct # for neat structuring of binary data
 import time # for delaying the main loop (just time.sleep())
 import traceback # for printing the full traceback of exceptions
@@ -33,9 +35,20 @@ PARAMETERS = {
 
 # Adapted from the official reSpeaker Wiki (https://wiki.seeedstudio.com/respeaker_xvf3800_python_sdk/)
 class reSpeaker:
+    """Read or write XVF3800 control parameters over USB vendor transfers."""
+
     TIMEOUT = 10_000 # USB timeout - 10 seconds
     
     def __init__(self, dev, config: AppConfig):
+        """Wrap an already-discovered USB device and its application config.
+
+        Parameters:
+            * dev : Discovered USB device object.
+            * config : Application configuration associated with the device.
+
+        Returns:
+            None.
+        """
         self.dev = dev
         self.config = config
         
@@ -48,6 +61,19 @@ class reSpeaker:
         return
     
     def write(self, name, data_list):
+        """Write a supported writable parameter using its configured encoding.
+
+        Parameters:
+            * name : Name of the USB control parameter.
+            * data_list : Values to encode and send.
+
+        Raises:
+            ValueError: If the parameter is read-only or the value count does
+                not match its specification.
+
+        Returns:
+            None.
+        """
         if name in PARAMETERS:
             data = PARAMETERS[name]
         
@@ -76,6 +102,20 @@ class reSpeaker:
         return
     
     def read(self, name):
+        """Read a supported parameter and decode its response values.
+
+        Parameters:
+            * name : Name of the USB control parameter.
+
+        Notes:
+            The device documentation does not clearly specify write-only
+            parameter read behavior, so this method does not reject those
+            reads in advance.
+
+        Returns:
+            A list of decoded values for a supported parameter, or ``None`` if
+            the parameter name is unknown.
+        """
         result = None
         
         if name in PARAMETERS:
@@ -110,10 +150,27 @@ class reSpeaker:
         return result
     
     def close(self):
+        """Release resources associated with the USB device.
+
+        Returns:
+            None.
+        """
         usb.util.dispose_resources(self.dev)
         return
 
 def find(vid=0x2886, pid=0x001A):
+    """Find the XVF3800 by USB vendor/product ID.
+
+    Parameters:
+        * vid : USB vendor ID to search for.
+        * pid : USB product ID to search for.
+
+    Returns:
+        A wrapper around the discovered USB device.
+
+    Raises:
+        RuntimeError: If no matching USB device is found.
+    """
     if sys.platform.startswith("win"):
         dev = libusb_package.find(idVendor=vid, idProduct=pid)
     else:
@@ -127,6 +184,11 @@ def find(vid=0x2886, pid=0x001A):
     return reSpeaker(dev, AppConfig())
 
 def main():
+    """Read and print microphone firmware and direction-of-arrival values.
+
+    Returns:
+        None.
+    """
     try:
         dev = find()
         print("Device found" if dev else "No device found")

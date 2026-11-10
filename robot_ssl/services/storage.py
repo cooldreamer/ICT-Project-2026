@@ -8,7 +8,17 @@ from typing import Any
 
 
 class DatabaseStore:
+    """Persist and retrieve perception-event metadata in SQLite."""
+
     def __init__(self, path: Path | str) -> None:
+        """Open the database and create the event table if needed.
+
+        Parameters:
+            * path : SQLite database file path.
+
+        Returns:
+            None.
+        """
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
@@ -32,6 +42,14 @@ class DatabaseStore:
         self.connection.commit()
 
     def save_event(self, event: dict[str, Any]) -> None:
+        """Store an event's transcript, direction, decisions, and voice traits.
+
+        Parameters:
+            * event : Perception event and associated metadata to persist.
+
+        Returns:
+            None.
+        """
         with self.lock:
             self.connection.execute("""
                 INSERT INTO perception_events (
@@ -53,7 +71,17 @@ class DatabaseStore:
 
 
     def load_recent_events(self, limit: int = 20) -> list[dict[str, Any]]:
-        """Load recent event metadata from storage (newest first)."""
+        """Load recent event metadata from storage, newest first.
+
+        Parameters:
+            * limit : Maximum number of events to return; must be at least 1.
+
+        Returns:
+            A list of event dictionaries, limited to the requested count.
+
+        Raises:
+            ValueError: If ``limit`` is less than 1.
+        """
         if limit < 1:
             raise ValueError("limit must be >= 1")
         with self.lock:
@@ -82,5 +110,10 @@ class DatabaseStore:
         return events
 
     def close(self) -> None:
+        """Close the SQLite connection.
+
+        Returns:
+            None.
+        """
         with self.lock:
             self.connection.close()

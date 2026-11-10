@@ -7,11 +7,13 @@ import numpy as np
 
 @dataclass
 class LocalizationResult:
+    """Azimuth estimate, relative confidence, and scores for tested directions."""
+
     azimuth_degrees: float
     confidence: float
     scores: np.ndarray
 
-# Note: This should be replaced with the thereSpeaker SVF3800's DoA detection
+# Note: This should be replaced with the reSpeaker XVF3800's DoA detection
 class SRPPHATLocalizer:
     """Estimate horizontal direction of arrival using phase-normalised cross spectra.
 
@@ -19,6 +21,9 @@ class SRPPHATLocalizer:
     straight ahead and positive angles rotate left. Microphones must share a clock.
     A non-collinear array with at least 3 microphones is recommended to reduce
     ambiguities. This is a far-field azimuth estimator, not a 3-D range estimator.
+
+    This software estimator is a fallback; prefer the XVF3800's on-device DoA
+    detection when that integration is available.
     """
 
     def __init__(
@@ -30,6 +35,19 @@ class SRPPHATLocalizer:
         min_frequency_hz: float = 250.0,
         max_frequency_hz: float = 7_000.0,
     ) -> None:
+        """Prepare microphone geometry and the angular/frequency search grid.
+
+        Parameters:
+            * microphone_positions_m : Microphone coordinates in metres.
+            * sample_rate : Input audio sample rate in hertz.
+            * speed_of_sound_m_s : Assumed sound speed in metres per second.
+            * angle_step_degrees : Spacing between tested azimuth directions.
+            * min_frequency_hz : Lower bound of the analysis frequency band.
+            * max_frequency_hz : Upper bound of the analysis frequency band.
+
+        Returns:
+            None.
+        """
         self.positions = np.asarray(microphone_positions_m, dtype=np.float64)
         self.sample_rate = sample_rate
         self.speed_of_sound = speed_of_sound_m_s
@@ -43,6 +61,16 @@ class SRPPHATLocalizer:
         ]
 
     def localize(self, frame: np.ndarray) -> LocalizationResult | None:
+        """Estimate source azimuth from one synchronized multichannel frame.
+
+        Parameters:
+            * frame : Audio samples shaped as
+                ``(sample_count, microphone_count)``.
+
+        Returns:
+            A localization result, or ``None`` if the frame is unusable or the
+            array has fewer than two microphones.
+        """
         data = np.asarray(frame, dtype=np.float64)
         if data.ndim != 2 or data.shape[1] != len(self.positions) or data.shape[0] < 128:
             return None

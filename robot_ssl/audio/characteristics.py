@@ -9,7 +9,17 @@ from robot_ssl.models import VoiceTraits
 
 
 def _estimate_pitch_median(audio: np.ndarray, sample_rate: int) -> float | None:
-    """Lightweight autocorrelation pitch estimate; unreliable for noisy/unvoiced audio."""
+    """Estimate median pitch with autocorrelation.
+
+    The estimate is unreliable for noisy or unvoiced audio.
+
+    Parameters:
+        * audio : Mono audio samples.
+        * sample_rate : Audio sample rate in hertz.
+
+    Returns:
+        Median pitch in hertz, or ``None`` if no voiced frames are detected.
+    """
     signal = np.asarray(audio, dtype=np.float64)
     frame_size = int(0.040 * sample_rate)
     hop = int(0.020 * sample_rate)
@@ -42,6 +52,15 @@ def _estimate_pitch_median(audio: np.ndarray, sample_rate: int) -> float | None:
 
 
 def extract_voice_traits(audio: np.ndarray, sample_rate: int = 16_000) -> VoiceTraits:
+    """Extract basic pitch, level, and spectral descriptors from mono audio.
+
+    Parameters:
+        * audio : Mono audio samples.
+        * sample_rate : Audio sample rate in hertz.
+
+    Returns:
+        The measured acoustic descriptors. Empty audio produces default traits.
+    """
     signal = np.asarray(audio, dtype=np.float32).reshape(-1)
     if signal.size == 0:
         return VoiceTraits()
@@ -76,6 +95,18 @@ class AccentClassifier:
     """
 
     def __init__(self, model_path: str | None = None) -> None:
+        """Load an optional joblib-serialized classifier from disk.
+
+        Parameters:
+            * model_path : Optional path to the serialized classifier.
+
+        Returns:
+            None.
+
+        Raises:
+            RuntimeError: If a model path is supplied but ``joblib`` is not
+                installed.
+        """
         self.model = None
         if model_path:
             try:
@@ -85,6 +116,16 @@ class AccentClassifier:
             self.model = joblib.load(Path(model_path))
 
     def predict(self, traits: VoiceTraits) -> tuple[str, float | None]:
+        """Predict an accent label when a classifier is configured.
+
+        Parameters:
+            * traits : Acoustic features to classify.
+
+        Returns:
+            A label and its maximum predicted class probability, or ``None``
+            confidence if probabilities are unavailable. Without a model,
+            returns an unknown label and ``None``.
+        """
         if self.model is None:
             return "unknown (no trained accent classifier configured)", None
         vector = np.array([[

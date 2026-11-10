@@ -1,7 +1,17 @@
+"""Tests for persisting and reloading perception-event metadata."""
+
 from robot_ssl.services.storage import DatabaseStore
 
 
 def test_event_store_can_save_and_load(tmp_path):
+    """Check that an event round-trips through SQLite with typed fields.
+
+    Parameters:
+        * tmp_path : Pytest-provided temporary directory for the database.
+
+    Returns:
+        None.
+    """
     store = DatabaseStore(tmp_path / "events.sqlite3")
     store.save_event({
         "transcript": "hey robot",

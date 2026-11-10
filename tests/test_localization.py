@@ -1,3 +1,5 @@
+"""Tests for direction-of-arrival estimation and angle averaging."""
+
 import numpy as np
 
 from robot_ssl.audio.localization import SRPPHATLocalizer
@@ -6,6 +8,16 @@ from robot_ssl.config import DEFAULT_MIC_POSITIONS
 
 
 def synthesize_far_field(angle_degrees: float, n_samples: int = 8192, sample_rate: int = 16000):
+    """Generate multichannel noise with delays for a far-field source angle.
+
+    Parameters:
+        * angle_degrees : Simulated source azimuth.
+        * n_samples : Number of samples to generate.
+        * sample_rate : Sampling rate in hertz.
+
+    Returns:
+        A float32 array with one simulated signal channel per microphone.
+    """
     rng = np.random.default_rng(11)
     source = rng.normal(0.0, 0.1, n_samples)
     source_spectrum = np.fft.rfft(source)
@@ -20,6 +32,11 @@ def synthesize_far_field(angle_degrees: float, n_samples: int = 8192, sample_rat
 
 
 def test_srp_phat_estimates_positive_left_azimuth():
+    """Check that SRP-PHAT estimates a synthetic source from the left.
+
+    Returns:
+        None.
+    """
     audio = synthesize_far_field(40.0)
     result = SRPPHATLocalizer(DEFAULT_MIC_POSITIONS, angle_step_degrees=1.0).localize(audio)
     assert result is not None
@@ -27,6 +44,11 @@ def test_srp_phat_estimates_positive_left_azimuth():
 
 
 def test_circular_mean_works_across_angle_wrap():
+    """Check that angles around the wrap boundary average near 180 degrees.
+
+    Returns:
+        None.
+    """
     result = circular_mean_degrees([179.0, -179.0])
     assert result is not None
     assert abs(abs(result) - 180.0) < 2.0

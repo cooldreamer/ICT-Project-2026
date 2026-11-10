@@ -19,6 +19,11 @@ class VoiceTraits:
     accent_confidence: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        """Convert the trait fields to a plain dictionary.
+
+        Returns:
+            A dictionary containing all voice-trait fields.
+        """
         return asdict(self)
 
 
@@ -34,4 +39,9 @@ class AudioSegment:
 
     @property
     def duration_seconds(self) -> float:
+        """Calculate the segment duration, assuming 16 kHz audio.
+
+        Returns:
+            Segment duration in seconds.
+        """
         return float(self.samples.shape[0]) / 16_000.0

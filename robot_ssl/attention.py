@@ -6,6 +6,15 @@ from robot_ssl.models import VoiceTraits
 
 
 def circular_angle_difference(a: float, b: float) -> float:
+    """Calculate the shortest absolute angular distance between two angles.
+
+    Parameters:
+        * a : First angle in degrees.
+        * b : Second angle in degrees.
+
+    Returns:
+        The difference in degrees, from 0 to 180.
+    """
     return abs((a - b + 180.0) % 360.0 - 180.0)
 
 
@@ -16,6 +25,16 @@ class SubjectSpeechDetectionModel:
     if the robot must reliably distinguish people in multi-speaker environments.
     """
     def score(self, reference: VoiceTraits | None, current: VoiceTraits, angle_delta: float) -> float:
+        """Score similarity using direction and available acoustic features.
+
+        Parameters:
+            * reference : Traits from the previously addressed speaker, if known.
+            * current : Traits extracted from the current utterance.
+            * angle_delta : Angular difference from the reference direction.
+
+        Returns:
+            A heuristic similarity score from 0.0 to 1.0.
+        """
         spatial = math.exp(-angle_delta / 30.0)
         if reference is None:
             return 0.75 * spatial + 0.25 * 0.5
@@ -34,7 +53,19 @@ class SubjectSpeechDetectionModel:
 
 
 class AttentionMaintenanceSystem:
+    """Track a wake-word-identified speaker for a limited time window."""
+
     def __init__(self, timeout_seconds: float = 8.0, angle_tolerance_degrees: float = 35.0) -> None:
+        """Create an attention tracker with session and direction thresholds.
+
+        Parameters:
+            * timeout_seconds : Duration before an attention session expires.
+            * angle_tolerance_degrees : Maximum direction change accepted as
+                likely continuation.
+
+        Returns:
+            None.
+        """
         self.timeout_seconds = timeout_seconds
         self.angle_tolerance_degrees = angle_tolerance_degrees
         self.subject_angle: float | None = None
@@ -44,9 +75,24 @@ class AttentionMaintenanceSystem:
 
     @property
     def active(self) -> bool:
+        """Check whether the current attention session has not timed out.
+
+        Returns:
+            ``True`` while the attention session is active.
+        """
         return time.monotonic() < self.active_until
 
     def engage(self, angle: float | None, traits: VoiceTraits, now: float | None = None) -> None:
+        """Start or refresh attention for a speaker and record reference traits.
+
+        Parameters:
+            * angle : Estimated speaker direction in degrees, if available.
+            * traits : Acoustic traits to use as the speaker reference.
+            * now : Optional monotonic timestamp; defaults to the current time.
+
+        Returns:
+            None.
+        """
         now = time.monotonic() if now is None else now
         if angle is not None:
             self.subject_angle = angle
@@ -60,6 +106,18 @@ class AttentionMaintenanceSystem:
         speech_detected: bool = True,
         now: float | None = None,
     ) -> float:
+        """Score likely continuation and refresh the session when the score is high.
+
+        Parameters:
+            * angle : Current estimated speaker direction in degrees.
+            * traits : Acoustic traits extracted from the current utterance.
+            * speech_detected : Whether the current segment contains speech.
+            * now : Optional monotonic timestamp; defaults to the current time.
+
+        Returns:
+            A continuation score from 0.0 to 1.0; 0.0 when continuation cannot
+            be established.
+        """
         now = time.monotonic() if now is None else now
         if not speech_detected or now >= self.active_until or self.subject_angle is None or angle is None:
             return 0.0

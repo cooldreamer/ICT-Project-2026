@@ -5,7 +5,19 @@ import numpy as np
 
 
 class SpeechToText:
+    """Optional faster-whisper adapter for utterance transcription."""
+
     def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8") -> None:
+        """Attempt to load a Whisper model with the requested runtime settings.
+
+        Parameters:
+            * model_size : faster-whisper model name or path.
+            * device : Inference device, such as ``cpu`` or ``cuda``.
+            * compute_type : Model computation precision.
+
+        Returns:
+            None.
+        """
         self.model = None
         self.error: str | None = None
         try:
@@ -18,9 +30,24 @@ class SpeechToText:
 
     @property
     def available(self) -> bool:
+        """Check whether the speech-recognition model loaded successfully.
+
+        Returns:
+            ``True`` if the model is available; otherwise, ``False``.
+        """
         return self.model is not None
 
     def transcribe(self, audio: np.ndarray) -> tuple[str, str | None]:
+        """Transcribe mono audio.
+
+        Parameters:
+            * audio : Mono audio samples to transcribe.
+
+        Returns:
+            A pair containing transcript text and detected language. Returns
+            empty text and ``None`` when transcription is unavailable or the
+            input is too short.
+        """
         if self.model is None:
             return "", None
         signal = np.asarray(audio, dtype=np.float32).reshape(-1)

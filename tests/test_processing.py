@@ -1,8 +1,15 @@
+"""Tests for audio cleaning, frame features, and speech segmentation."""
+
 import numpy as np
 from robot_ssl.audio.processing import AudioCleaner, SpeechSegmenter, extract_frame_features
 
 
 def test_cleaner_returns_finite_multichannel_audio():
+    """Verify that cleaning preserves shape and produces finite samples.
+
+    Returns:
+        None.
+    """
     cleaner = AudioCleaner(sample_rate=16000, channels=2)
     frame = np.random.default_rng(2).normal(0, 0.03, (1280, 2)).astype(np.float32)
     cleaned = cleaner.clean(frame)
@@ -11,6 +18,11 @@ def test_cleaner_returns_finite_multichannel_audio():
 
 
 def test_segmenter_returns_an_utterance_after_silence():
+    """Verify that speech followed by silence yields a multichannel segment.
+
+    Returns:
+        None.
+    """
     sample_rate = 16000
     frame_samples = 1280
     segmenter = SpeechSegmenter(sample_rate, frame_samples, min_rms=0.004, end_silence_seconds=0.16, min_speech_seconds=0.16)

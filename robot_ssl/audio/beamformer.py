@@ -5,17 +5,46 @@ import numpy as np
 
 
 class DelayAndSumBeamformer:
+    """Steer multichannel audio toward an azimuth and average aligned channels."""
+
     def __init__(
         self,
         microphone_positions_m: tuple[tuple[float, float], ...],
         sample_rate: int = 16_000,
         speed_of_sound_m_s: float = 343.0,
     ) -> None:
+        """Initialize the beamformer with microphone geometry and audio parameters.
+
+        Parameters:
+            * microphone_positions_m : Microphone coordinates in metres, ordered
+                to match the input audio channels.
+            * sample_rate : Audio sample rate in hertz.
+            * speed_of_sound_m_s : Assumed speed of sound in metres per second.
+
+        Returns:
+            None.
+        """
         self.positions = np.asarray(microphone_positions_m, dtype=np.float64)
         self.sample_rate = sample_rate
         self.speed_of_sound = speed_of_sound_m_s
 
     def beamform(self, samples: np.ndarray, azimuth_degrees: float | None) -> np.ndarray:
+        """Create mono audio steered to the requested azimuth when available.
+
+        Parameters:
+            * samples : Audio samples as a mono array or a
+                ``(sample_count, channel_count)`` multichannel array.
+            * azimuth_degrees : Estimated source direction in degrees, with 0°
+                forward and positive angles to the left; ``None`` uses channel
+                averaging without steering.
+
+        Returns:
+            A one-dimensional float32 audio signal.
+
+        Raises:
+            ValueError: If the audio channel count does not match the microphone
+                geometry.
+        """
         data = np.asarray(samples, dtype=np.float32)
         if data.ndim == 1:
             return data.copy()

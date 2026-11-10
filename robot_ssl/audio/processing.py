@@ -12,6 +12,8 @@ from robot_ssl.models import AudioSegment
 
 @dataclass
 class FrameFeatures:
+    """Signal-level and spectral measurements for an audio frame."""
+
     rms: float
     rms_dbfs: float
     zero_crossing_rate: float
@@ -23,6 +25,15 @@ class AudioCleaner:
     """Remove DC/low-frequency rumble and constrain the band for speech processing."""
 
     def __init__(self, sample_rate: int, channels: int) -> None:
+        """Set up a persistent band-pass filter for the configured stream.
+
+        Parameters:
+            * sample_rate : Input audio sample rate in hertz.
+            * channels : Number of audio channels in each frame.
+
+        Returns:
+            None.
+        """
         self.sample_rate = sample_rate
         self.channels = channels
         upper_hz = min(7_500.0, sample_rate * 0.45)
@@ -30,6 +41,17 @@ class AudioCleaner:
         self.zi = np.zeros((self.sos.shape[0], 2, channels), dtype=np.float64)
 
     def clean(self, frame: np.ndarray) -> np.ndarray:
+        """Sanitize, clip, and band-pass filter one audio frame.
+
+        Parameters:
+            * frame : Mono or multichannel audio frame to clean.
+
+        Returns:
+            The filtered frame as float32 audio.
+
+        Raises:
+            ValueError: If the frame's channel count differs from configuration.
+        """
         data = np.asarray(frame, dtype=np.float32)
         if data.ndim == 1:
             data = data[:, None]
@@ -42,7 +64,18 @@ class AudioCleaner:
 
 
 def extract_frame_features(frame: np.ndarray, sample_rate: int) -> FrameFeatures:
-    """Extract inexpensive descriptive features from a mono or multichannel frame."""
+    """Extract inexpensive descriptive features from an audio frame.
+
+    RMS uses all channels so differences in microphone arrival times do not
+    cause phase cancellation to suppress the VAD level measurement.
+
+    Parameters:
+        * frame : Mono or multichannel audio samples.
+        * sample_rate : Audio sample rate in hertz.
+
+    Returns:
+        RMS, dBFS, zero-crossing, spectral-centroid, and clipping measurements.
+    """
     data = np.asarray(frame, dtype=np.float32)
     mono = data if data.ndim == 1 else data.mean(axis=1)
     if mono.size == 0:
@@ -84,6 +117,21 @@ class SpeechSegmenter:
         min_speech_seconds: float = 0.24,
         max_segment_seconds: float = 12.0,
     ) -> None:
+        """Initialize adaptive energy-VAD and utterance-boundary settings.
+
+        Parameters:
+            * sample_rate : Audio sample rate in hertz.
+            * frame_samples : Number of samples in each input frame.
+            * min_rms : Minimum RMS level considered speech.
+            * noise_multiplier : Multiplier applied to the adaptive noise floor.
+            * end_silence_seconds : Silence duration required to end a segment.
+            * pre_roll_seconds : Audio retained before speech onset.
+            * min_speech_seconds : Minimum speech duration for a segment.
+            * max_segment_seconds : Maximum utterance duration.
+
+        Returns:
+            None.
+        """
         self.sample_rate = sample_rate
         self.frame_samples = frame_samples
         self.min_rms = min_rms
@@ -112,6 +160,20 @@ class SpeechSegmenter:
         doa_confidence: float | None = None,
         now: float | None = None,
     ) -> AudioSegment | None:
+        """Accumulate frames and produce an utterance when endpointing completes.
+
+        Parameters:
+            * frame : Current multichannel audio frame.
+            * rms : Measured frame RMS level.
+            * doa_angle : Current estimated source direction, if available.
+            * wakeword_detected : Whether a wake word was detected in this frame.
+            * doa_confidence : Optional confidence for the current direction.
+            * now : Optional monotonic time for the frame.
+
+        Returns:
+            A speech segment meeting the configured duration threshold, or
+            ``None`` until endpointing completes or if the segment is too short.
+        """
         now = time.monotonic() if now is None else now
         speech_threshold = max(self.min_rms, self.noise_rms * self.noise_multiplier)
         is_speech = rms >= speech_threshold

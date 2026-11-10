@@ -6,7 +6,18 @@ from tkinter import ttk
 
 
 class Dashboard:
+    """Display live pipeline telemetry and recent speech events in Tkinter."""
+
     def __init__(self, event_queue: queue.Queue, stop_event) -> None:
+        """Create the dashboard and schedule periodic event-queue polling.
+
+        Parameters:
+            * event_queue : Queue carrying pipeline status, telemetry, and events.
+            * stop_event : Event set when the app should shut down.
+
+        Returns:
+            None.
+        """
         self.events = event_queue
         self.stop_event = stop_event
         self.root = tk.Tk()
@@ -48,12 +59,25 @@ class Dashboard:
         self.root.after(100, self._poll_events)
 
     def _append(self, text: str) -> None:
+        """Append a message to the read-only utterance history widget.
+
+        Parameters:
+            * text : Message to append.
+
+        Returns:
+            None.
+        """
         self.output.configure(state="normal")
         self.output.insert("end", text + "\n\n")
         self.output.see("end")
         self.output.configure(state="disabled")
 
     def _poll_events(self) -> None:
+        """Drain queued events and refresh the dashboard's visible state.
+
+        Returns:
+            None.
+        """
         while True:
             try:
                 event = self.events.get_nowait()
@@ -93,8 +117,18 @@ class Dashboard:
             self.root.after(100, self._poll_events)
 
     def close(self) -> None:
+        """Signal pipeline shutdown and close the dashboard window.
+
+        Returns:
+            None.
+        """
         self.stop_event.set()
         self.root.destroy()
 
     def run(self) -> None:
+        """Run Tkinter's event loop until the window closes.
+
+        Returns:
+            None.
+        """
         self.root.mainloop()

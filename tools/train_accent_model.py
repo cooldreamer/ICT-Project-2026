@@ -5,7 +5,9 @@ Expected CSV columns:
 
 This is an educational baseline, not a reliable accent-recognition system. Use only
 consented data, prevent speaker leakage across splits, and evaluate on speakers that
-were not used for training before using results in a robot.
+were not used for training before using results in a robot. The script reports its
+hold-out evaluation before refitting the final model on all available rows; the
+random utterance split can still overstate generalization across speakers.
 """
 from __future__ import annotations
 import argparse
@@ -30,6 +32,12 @@ FEATURES = [
 
 
 def main() -> int:
+    """Train, evaluate, and save an accent classifier from labelled features.
+
+    Returns:
+        Process status 0 after successfully saving the model. Invalid CLI input
+        is reported by ``argparse`` and exits with a nonzero status.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset_csv", help="CSV containing labelled voice features")
     parser.add_argument("--model-out", default="models/accent_classifier.joblib")
