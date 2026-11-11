@@ -1,17 +1,16 @@
 """Launch the robot sound-localisation and attention pipeline."""
-from __future__ import annotations
+
 import argparse
 import json
 import logging
 from pathlib import Path
 import queue
-import sys
 import threading
 import time
 import numpy as np
 
 from robot_ssl.app import RobotAudioApp
-from robot_ssl.config import AppConfig, DEFAULT_MIC_POSITIONS
+from robot_ssl.config import AppConfig
 from robot_ssl.audio.localization import SRPPHATLocalizer
 
 
@@ -28,7 +27,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Robot sound source localisation, wake-word, and speech attention pipeline")
     parser.add_argument("--device", help="Input device index (run --list-devices to inspect devices)")
     parser.add_argument("--use-general-mic-model", default="true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
-    # NOT NEEDED since mic geometry defines this #parser.add_argument("--channels", type=int, default=AppConfig.channels, help="Mic channels; must match the connected microphone array (under XVF3800, 2 channels have total audio/DoA data so two less than the total channels is assumed)")
     parser.add_argument("--mic-geometry", help="JSON file containing microphone positions in metres, channel order; format: [[x,y], ...]")
     parser.add_argument("--wakeword-model", help="Path to an openWakeWord ONNX/TFLite model; if omitted, transcript wake phrases are used")
     parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases") # what does this mean
@@ -46,35 +44,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_geometry(path: str | None, channels: int) -> tuple[tuple[float, float], ...]:
-    """Load or select microphone coordinates and verify their channel count.
+def load_geometry(path: str) -> tuple[tuple[float, float], ...]:
+    """Load or select microphone coordinates.
 
     Parameters:
         * path : Optional JSON file containing microphone coordinate pairs.
-        * channels : Number of microphone channels to configure.
 
     Returns:
         Microphone positions as ``(x, y)`` coordinate pairs.
 
     Raises:
-        ValueError: If no default geometry exists for the channel count or the
-            supplied geometry does not match it.
+        ValueError: If the microphone geometry is not supplied in a valid format/structure.
     """
-    if path:
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
-        positions = tuple(tuple(float(value) for value in pair) for pair in raw)
-    else:
-        if channels == len(DEFAULT_MIC_POSITIONS):
-            positions = DEFAULT_MIC_POSITIONS
-        elif channels == 1:
-            positions = ((0.0, 0.0),)
-        else:
-            raise ValueError(
-                f"No default geometry for {channels} channels. Supply --mic-geometry with one [x,y] pair per channel."
-            )
-    if len(positions) != channels or any(len(point) != 2 for point in positions):
+    
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    positions = tuple(tuple(float(value) for value in pair) for pair in raw)
+    
+    if any(len(point) != 2 for point in positions):
         raise ValueError("Microphone geometry must contain exactly one [x, y] pair per input channel")
-    return positions # type: ignore
+    
+    return positions # type: ignore (above check already enforces type match)
 
 
 def list_audio_devices() -> None:
@@ -106,6 +95,7 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
     if len(positions) < 2:
         print("DoA demo needs at least 2 microphone positions; use 3+ non-collinear microphones for best results.")
         return 2
+    
     sample_rate = 16_000
     n_samples = 8_192
     expected_angle = 40.0
@@ -115,6 +105,7 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
     frequencies = np.fft.rfftfreq(n_samples, 1.0 / sample_rate)
     theta = np.deg2rad(expected_angle)
     direction = np.array([np.cos(theta), np.sin(theta)])
+    
     audio = []
     for position in np.asarray(positions, dtype=np.float64):
         arrival_delay = -float(np.dot(position, direction)) / 343.0
@@ -131,7 +122,6 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
     print(f"Absolute azimuth error: {error:.1f}°")
     return 0 if error <= 8.0 else 1
 
-
 def main() -> int:
     """Run the demo, device listing, or configured audio-perception application.
 
@@ -147,7 +137,7 @@ def main() -> int:
         list_audio_devices()
         return 0
 
-    positions = load_geometry(args.mic_geometry, args.channels)
+    positions = load_geometry(args.mic_geometry)
     if args.demo:
         return run_doa_demo(positions)
 
@@ -155,8 +145,8 @@ def main() -> int:
     if isinstance(device, str) and device.isdigit():
         device = int(device)
     config = AppConfig(
-        #channels=args.channels,
-        microphone_positions_m=positions,
+        use_xvf3800_mic_model=(args.use_general_mic_model != "true"),
+        _microphone_positions_m = positions,
         wakeword_model_path=args.wakeword_model,
         stt_model=args.stt_model,
         stt_device=args.stt_device,

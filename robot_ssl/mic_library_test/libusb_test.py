@@ -162,8 +162,8 @@ def find(vid=0x2886, pid=0x001A):
     """Find the XVF3800 by USB vendor/product ID.
 
     Parameters:
-        * vid : USB vendor ID to search for.
-        * pid : USB product ID to search for.
+        * vid : USB vendor ID for which to search (defaults to manufacturer-spec'd vendor ID).
+        * pid : USB product ID for which to search (defaults to manufacturer-spec'd product ID).
 
     Returns:
         A wrapper around the discovered USB device.

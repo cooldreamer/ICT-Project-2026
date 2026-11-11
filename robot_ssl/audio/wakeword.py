@@ -1,5 +1,5 @@
 """Optional openWakeWord integration with a safe disabled fallback."""
-from __future__ import annotations
+
 import logging
 import time
 import numpy as np

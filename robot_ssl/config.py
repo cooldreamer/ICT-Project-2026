@@ -151,12 +151,14 @@ class AppConfig:
             with open("robot_ssl/config.json") as json_file:
                 json_settings = json.load(json_file)
         except FileNotFoundError:
-            print("JSON config file not found.  Using input or default settings.")
+            print("JSON config file not found.  Using command args or default settings.")
         
         return json_settings
     
     def load_properties(self):
-        """Bind device-dependent settings to the active microphone profile.
+        """Load dynamic values for the XVF3800 usage-dependent open-facing properties.
+        
+        Bind device-dependent settings to the active microphone profile.
 
         With the XVF3800 profile enabled, public settings read from module constants.
         Otherwise, they read from their underscored instance fields.
