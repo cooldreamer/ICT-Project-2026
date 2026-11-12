@@ -1,12 +1,13 @@
-"""Launch the robot sound-localisation and attention pipeline."""
+"""Manage the operation of the entire program."""
 
-import argparse
-import json
-import logging
+import argparse # for console-level argument parsing
+import json # for loading and reading json files into dictionaries
+import logging # for detailed logging of errors and warnings
 from pathlib import Path
 import queue
 import threading
 import time
+from turtle import position
 import numpy as np
 
 from robot_ssl.app import RobotAudioApp
@@ -44,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_geometry(path: str) -> tuple[tuple[float, float], ...]:
+def load_geometry(path: str) -> tuple[tuple[float, float], ...] | None:
     """Load or select microphone coordinates.
 
     Parameters:
@@ -57,12 +58,21 @@ def load_geometry(path: str) -> tuple[tuple[float, float], ...]:
         ValueError: If the microphone geometry is not supplied in a valid format/structure.
     """
     
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    positions = tuple(tuple(float(value) for value in pair) for pair in raw)
+    positions = None
     
-    if any(len(point) != 2 for point in positions):
-        raise ValueError("Microphone geometry must contain exactly one [x, y] pair per input channel")
-    
+    try:
+        try:
+            with open(path) as json_file:
+                json_geometry = json.loads(path)
+        except TypeError:
+            raise FileNotFoundError
+            
+        positions = tuple(tuple(float(value) for value in pair) for pair in json_geometry)
+        
+        if any(len(point) != 2 for point in positions):
+            raise ValueError("Microphone geometry must contain exactly one [x, y] pair per input channel")
+    except FileNotFoundError:
+        raise FileNotFoundError("JSON geometry file not found at input path")
     return positions # type: ignore (above check already enforces type match)
 
 
@@ -123,85 +133,113 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
     return 0 if error <= 8.0 else 1
 
 def main() -> int:
-    """Run the demo, device listing, or configured audio-perception application.
+    """Run the program depending on what command line arguments have been set.
+    
+    * If `--list-devices` is set, run the method to list available devices (see `list_audio_devices()`); 
+    * If `--demo` is set, run the DoA demo and report its error; 
+    * Otherwise, run the standard configured audio-perception application.
 
     Returns:
         The demo status, or 0 after the application exits normally.
     """
+    
+    returnval = 1
+    
     args = parse_args()
+    
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s | %(levelname)s | %(threadName)s | %(message)s",
     )
+    
+    # If the action desired of the command is to list audio devices, run the function to list audio devices
     if args.list_devices:
         list_audio_devices()
-        return 0
-
-    positions = load_geometry(args.mic_geometry)
-    if args.demo:
-        return run_doa_demo(positions)
-
-    device: int | str | None = args.device
-    if isinstance(device, str) and device.isdigit():
-        device = int(device)
-    config = AppConfig(
-        use_xvf3800_mic_model=(args.use_general_mic_model != "true"),
-        _microphone_positions_m = positions,
-        wakeword_model_path=args.wakeword_model,
-        stt_model=args.stt_model,
-        stt_device=args.stt_device,
-        stt_compute_type=args.stt_compute_type,
-        accent_model_path=args.accent_model,
-        robot_endpoint=args.robot_endpoint,
-        server_endpoint=args.server_endpoint,
-        database_path=Path(args.database),
-        log_level=args.log_level,
-    )
-    config.validate()
-    events: queue.Queue = queue.Queue(maxsize=200)
-    stop_event = threading.Event()
-    app = RobotAudioApp(
-        config,
-        event_queue=events,
-        stop_event=stop_event,
-        device=device,
-        wake_phrases=tuple(part.strip() for part in args.wake_phrases.split(",")),
-    )
-    worker = threading.Thread(target=app.run, name="robot-audio-app", daemon=False)
-    worker.start()
-
-    if not args.no_gui:
+        returnval = 0
+    else: # Otherwise: 
+        
+        # Process positions from the mic geometry supplied, if any; otherwise positions is None
+        positions = None
         try:
-            from robot_ssl.gui.dashboard import Dashboard
-            Dashboard(events, stop_event).run()
-        except ImportError:
-            logging.exception("Tkinter is unavailable; switching to console monitoring")
-            try:
-                while worker.is_alive():
-                    time.sleep(0.4)
-            except KeyboardInterrupt:
-                stop_event.set()
-    else:
-        try:
-            while worker.is_alive():
-                while True:
+            positions = load_geometry(args.mic_geometry) # (will error here if mic geometry path or data is invalid)
+        except FileNotFoundError:
+            pass
+        
+        # Process device from supplied device argument
+        device: int | str | None = args.device
+        if isinstance(device, str) and device.isdigit():
+            device = int(device)
+        
+        # Set up the configuration settings object.  
+        # (Note that special behaviour had to be written to make the default/JSON supplied values supersede empty argument entries.)
+        config = AppConfig(
+            **{key: value for key, value in {
+                "use_xvf3800_mic_model": args.use_general_mic_model != "true",
+                "_microphone_positions_m": positions,
+                "wakeword_model_path": args.wakeword_model,
+                "stt_model": args.stt_model,
+                "stt_device": args.stt_device,
+                "stt_compute_type": args.stt_compute_type,
+                "accent_model_path": args.accent_model,
+                "robot_endpoint": args.robot_endpoint,
+                "server_endpoint": args.server_endpoint,
+                "database_path": Path(args.database),
+                "log_level": args.log_level
+            }.items() if value is not None}
+        )
+        config.validate() # (will error here if input settings are invalid)
+        
+        # If the action desired of the command is to run the program's test demo, run the demo and output its results
+        if args.demo:
+            returnval = run_doa_demo(config.microphone_positions_m)
+        else: # Otherwise: 
+            
+            events: queue.Queue = queue.Queue(maxsize=200)
+            stop_event = threading.Event()
+            
+            app = RobotAudioApp(
+                config,
+                event_queue=events,
+                stop_event=stop_event,
+                device=device,
+                wake_phrases=tuple(part.strip() for part in args.wake_phrases.split(",")),
+            )
+            worker = threading.Thread(target=app.run, name="robot-audio-app", daemon=False)
+            worker.start()
+
+            if not args.no_gui:
+                try:
+                    from robot_ssl.gui.dashboard import Dashboard
+                    Dashboard(events, stop_event).run()
+                except ImportError:
+                    logging.exception("Tkinter is unavailable; switching to console monitoring")
                     try:
-                        event = events.get_nowait()
-                    except queue.Empty:
-                        break
-                    if event.get("type") == "segment":
-                        print(
-                            f"Transcript={event.get('transcript')!r}, azimuth={event.get('azimuth_degrees')}, "
-                            f"wakeword={event.get('wakeword_detected')}, addressed_robot={event.get('addressed_robot')}"
-                        )
-                    elif event.get("type") in ("status", "error"):
-                        print(f"{event.get('type', '').upper()}: {event.get('message', '')}")
-                time.sleep(0.15)
-        except KeyboardInterrupt:
+                        while worker.is_alive():
+                            time.sleep(0.4)
+                    except KeyboardInterrupt:
+                        stop_event.set()
+            else:
+                try:
+                    while worker.is_alive():
+                        while True:
+                            try:
+                                event = events.get_nowait()
+                            except queue.Empty:
+                                break
+                            if event.get("type") == "segment":
+                                print(
+                                    f"Transcript={event.get('transcript')!r}, azimuth={event.get('azimuth_degrees')}, "
+                                    f"wakeword={event.get('wakeword_detected')}, addressed_robot={event.get('addressed_robot')}"
+                                )
+                            elif event.get("type") in ("status", "error"):
+                                print(f"{event.get('type', '').upper()}: {event.get('message', '')}")
+                        time.sleep(0.15)
+                except KeyboardInterrupt:
+                    stop_event.set()
             stop_event.set()
-    stop_event.set()
-    worker.join()
-    return 0
+            worker.join()
+    
+    return returnval
 
 
 if __name__ == "__main__":

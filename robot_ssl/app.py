@@ -1,5 +1,4 @@
 """Application wiring for the complete robot audio-perception pipeline."""
-from __future__ import annotations
 
 from collections import Counter
 import logging
