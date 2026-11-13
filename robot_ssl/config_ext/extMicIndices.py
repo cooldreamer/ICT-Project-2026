@@ -1,7 +1,5 @@
 from typing import Iterable, Tuple, List # for type declaration of variables as a Tuple
-import warnings
-
-import test # for raising warnings for less critical issues in the project's operation
+import warnings # for raising warnings for less critical issues
 
 class MicIndices:
     """Class managing an instance of a microphone array's indices to the audio channels.
