@@ -1,1 +1,3 @@
-* Add comments throughout repository, for better understanding
+* Tidy up modules
+ ** Get the console working as fast as possible
+* Complete adding comments to extMicIndices.py

@@ -7,6 +7,12 @@ from typing import Tuple # for type declaration of variables as a Tuple
 import warnings # for raising warnings for less critical issues in the project's operation
 import json # for loading and reading a json file into a dictionary
 
+# Microphone Indices class
+if __name__ == "__main__":
+    from config_ext.extMicIndices import MicIndices
+else:
+    from robot_ssl.config_ext.extMicIndices import MicIndices
+
 # Robot-relative microphone coordinates in metres: (forward, left).
 # This default is a square 10 cm array. Replace it with measured coordinates for
 # the actual microphone array, in the same order as its mapped microphone channels.
@@ -27,7 +33,7 @@ XVF3800_MIC_POSITIONS: Tuple[Tuple[float, float], ...] = (
 
 XVF3800_INPUT_CHANNELS = 6
 XVF3800_SAMPLE_RATE = 16_000
-XVF3800_MIC_CHANNEL_INDICES: Tuple[int, ...] = (2, 3, 4, 5) # indexed from 0
+XVF3800_MIC_CHANNEL_INDICES: MicIndices = MicIndices(asr=0, sum=1, raw=(2, 3, 4, 5)) # indexed from 0
 
 @dataclass
 class AppConfig:
@@ -50,7 +56,7 @@ class AppConfig:
     _sample_rate: int = 16_000
     _input_channels: int = 4
     _microphone_positions_m: Tuple[Tuple[float, float], ...] = DEFAULT_MIC_POSITIONS
-    _microphone_channel_indices: Tuple[int, ...] = (0, 1, 2, 3)
+    _microphone_channel_indices: MicIndices = MicIndices(raw=(0, 1, 2, 3))
     
     # property_connections = {"input_channels": "XVF3800_INPUT_CHANNELS", "sample_rate": "XVF3800_SAMPLE_RATE", "microphone_positions_m": "XVF3800_MIC_POSITIONS", "microphone_channel_indices": "XVF3800_MIC_CHANNEL_INDICES"}
     
@@ -140,12 +146,12 @@ class AppConfig:
     # channels = 0
     
     def __post_init__(self):
-        """Install device-dependent properties and apply JSON overrides.
+        """Apply JSON overrides to attributes.
 
         Returns:
             None.
         """
-        # self.load_properties() # interpreter hates this but it works
+        # self.load_properties() # interpreter hates this but it works (note: it doesn't actually work)
         # self.channels = property(lambda self: len(self.microphone_positions_m))
         
         json_settings = self.load_json()
@@ -220,15 +226,24 @@ class AppConfig:
         
         if self.input_channels < 1:
             raise ValueError("input_channels must be at least 1")
-        if len(self.microphone_channel_indices) != len(self.microphone_positions_m):
+        if self.microphone_channel_indices.raw is not None and (
+            isinstance(self.microphone_channel_indices.raw, tuple) and len(self.microphone_channel_indices.raw) != len(self.microphone_positions_m)) or (
+                len(self.microphone_positions_m) == 1):
             raise ValueError("Each microphone position must have a corresponding input channel index")
-        if len(set(self.microphone_channel_indices)) != len(self.microphone_channel_indices):
+        if not self.microphone_channel_indices.checkMicUniqueness():
             raise ValueError("Each microphone can only be associated with one channel")
-        if any(index < 0 or index >= self.input_channels for index in self.microphone_channel_indices):
-            raise ValueError("Each microphone must have a valid corresponding input channel index")
+        if not self.microphone_channel_indices.checkMicBounds(self.input_channels):
+            raise ValueError("Each index must have a valid corresponding channel")
         
         if self.doa_step_degrees <= 0:
             raise ValueError("doa_step_degrees must be positive")
 
 if __name__ == "__main__":
-    AppConfig()
+    config = AppConfig()
+    try:
+        config.validate()
+    except ValueError as e:
+        print(e)
+        print(config.input_channels)
+        print(config.microphone_channel_indices)
+        print(config.microphone_positions_m)

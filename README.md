@@ -22,7 +22,7 @@ Synchronized mic array
 
 ## 2. Requirements and installation
 
-- Python 3.10 or later.
+- Python 3.15 or later.
 - A **synchronised multichannel microphone array** (usually a USB array or a multichannel audio interface) for useful DoA estimates. Several unrelated USB microphones are not automatically synchronised; their independent clocks and latencies can make phase/time-difference methods unreliable.
 - Microphone positions measured in metres, expressed relative to the robot, in the same order as the input channels.
 
@@ -35,11 +35,17 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Install optional speech recognition and wake-word packages:
+Install optional speech recognition, wake-word, model-training, USB-diagnostic,
+and test dependencies:
 
 ```bash
 python -m pip install -r requirements-optional.txt
 ```
+
+The speech-to-text and wake-word dependencies are skipped on Python 3.15 because
+their native ONNX Runtime dependency (and, on Linux, TFLite Runtime) does not yet
+provide compatible Python 3.15 wheels. Those optional features are therefore
+unavailable on Python 3.15 until upstream packages add support.
 
 `faster-whisper` loads the selected speech model when the application starts. The first run may need internet access to obtain the model if it is not already cached. For wake-word ML, obtain a compatible ONNX or TFLite model and pass its file path. For example, the openWakeWord project documents pre-trained models and its Python API at <https://github.com/tslapp/openwakeword> and <https://pypi.org/project/openwakeword/>. A model file is not bundled here.
 

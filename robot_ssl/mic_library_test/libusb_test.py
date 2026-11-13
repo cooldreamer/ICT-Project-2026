@@ -9,7 +9,7 @@ import libusb_package # Windows (a wrapper for libusb, a C library that provides
 import usb # Mac/Linux (pyusb, a Python library that provides easy access to USB devices)
 
 # Project config settings (for microphone array, etc.)
-# If the script is run directly, it cannot natively access the config module; adjustmust to the import path is needed to include the parent directory
+# If the script is run directly, it cannot natively access the config module; adjustment to the import path is needed to include the parent directory
 # (Note: Since this is a test script using an alternative method for reading the microphone array, we do not want to import the full robot app module)
 if __name__ == "__main__":
     import sys
