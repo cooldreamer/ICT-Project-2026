@@ -1,10 +1,15 @@
-# Optional speech-to-text backend. Its ONNX Runtime dependency does not yet
-# provide Python 3.15 wheels.
+# Optional speech-to-text backend.
 faster-whisper>=1.0; python_version < "3.15"
 
-# Optional wake-word detection runtime. Its ONNX Runtime dependency and,
-# on Linux, TFLite Runtime do not yet provide Python 3.15 wheels.
-openwakeword>=0.6; python_version < "3.15"
+# Optional ONNX inference dependencies, also used by the Linux openWakeWord
+# workaround documented in README.md.
+onnxruntime>=1.14,<2; python_version < "3.15"
+requests>=2.0,<3
+tqdm>=4.0,<5
+
+# The PyPI release also declares Linux TFLite Runtime, which has no Python 3.14
+# wheel. Linux users can install openWakeWord without dependencies for ONNX.
+openwakeword>=0.6; python_version < "3.15" and platform_system != "Linux"
 
 # Optional loader for a user-trained accent classifier
 joblib>=1.6.0

@@ -2,3 +2,7 @@
 **/.DS_STORE
 **/__pycache__/
 *.py[cod]
+.env/
+.venv/
+.pytest_cache/
+.vscode/
