@@ -193,7 +193,6 @@ class RobotAudioApp:
 
 
     # To Do: 
-    # * Only reference `raw` channels.
     # * Replace direct sounddevice interface with specialised reSpeaker XVF3800 interface library
     def run(self) -> None:
         """Capture microphone frames and enqueue completed speech segments.
