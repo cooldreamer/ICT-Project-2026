@@ -1,6 +1,6 @@
 * Tidy up modules
- ** Get program to auto select XVF microphone
- ** Get TTS working
+ ** Move try-excepts for imports to top and readjust program accordingly
+* Get TTS working
+* Get robot interface working
 * Complete adding comments to extMicIndices.py
 * Complete adding comments to main.py
-* Move try-excepts for imports to top and readjust program accordingly

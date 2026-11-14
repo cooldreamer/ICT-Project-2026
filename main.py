@@ -7,6 +7,7 @@ from pathlib import Path
 import queue
 import threading
 import time
+from typing import Dict
 import numpy as np
 
 from robot_ssl.app import RobotAudioApp
@@ -79,7 +80,7 @@ def list_audio_devices() -> None:
     """Print audio devices available through sounddevice.
 
     Raises:
-        RuntimeError: If ``sounddevice`` is not installed.
+        RuntimeError: If `sounddevice` is not installed.
 
     Returns:
         None.
@@ -175,6 +176,19 @@ def main() -> int:
         device: int | str | None = args.device
         if isinstance(device, str) and device.isdigit():
             device = int(device)
+        elif not args.use_general_mic_model:
+            if not device:
+                try:
+                    import sounddevice as sd
+                except ImportError as exc:
+                    raise RuntimeError("Install sounddevice first: pip install sounddevice") from exc
+                xvf3800devicei = -1
+                try:
+                    xvf3800devicei = next(filter(lambda x: ("reSpeaker" in x[1]['name'] and "XVF3800" in x[1]['name']) if isinstance(x[1], Dict) else False, enumerate(sd.query_devices())))[0]
+                except StopIteration:
+                    pass
+                print("Detected reSpeaker XVF3800 index:", xvf3800devicei)
+                device = xvf3800devicei if xvf3800devicei >= 0 else None
         
         if args.wakeword_model is not None: args.wakeword_model = Path(args.wakeword_model)
         if args.database is not None: args.database = Path(args.database)
