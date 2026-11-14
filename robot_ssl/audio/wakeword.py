@@ -1,14 +1,24 @@
 """Optional openWakeWord integration with a safe disabled fallback."""
 
 import logging
+from pathlib import Path
 import time
 import numpy as np
 
 
 class WakeWordDetector:
     """Optional openWakeWord adapter with threshold and cooldown handling."""
+    
+    @property
+    def enabled(self) -> bool:
+        """Check whether a wake-word model is ready for inference.
 
-    def __init__(self, model_path: str | None, threshold: float = 0.5, cooldown_seconds: float = 2.0) -> None:
+        Returns:
+            ``True`` if a model is loaded; otherwise, ``False``.
+        """
+        return self.model is not None
+
+    def __init__(self, model_path: Path | None, threshold: float = 0.5, cooldown_seconds: float = 2.0) -> None:
         """Load a wake-word model when a model path is provided.
 
         Parameters:
@@ -20,14 +30,14 @@ class WakeWordDetector:
             None.
 
         Raises:
-            RuntimeError: If a model path is provided but ``openwakeword`` is
-                not installed.
+            RuntimeError: If a model path is provided but `openwakeword` is not installed.
         """
         self.threshold = threshold
         self.cooldown_seconds = cooldown_seconds
         self.last_trigger = 0.0
         self.model = None
-        self.model_name: str | None = None
+        self.model_name: Path | None = None
+        
         if model_path:
             try:
                 from openwakeword.model import Model
@@ -36,18 +46,17 @@ class WakeWordDetector:
                 raise RuntimeError(
                     "A wake-word model path was supplied. Install the optional dependency with: pip install openwakeword"
                 ) from exc
-            self.model = Model(wakeword_models=[model_path], inference_framework="onnx" if model_path.lower().endswith(".onnx") else "tflite")
+            try:
+                self.model = Model(wakeword_models=[str(model_path)], inference_framework="onnx" if model_path.suffix == ".onnx" else "tflite")
+            except FileNotFoundError:
+                import openwakeword.utils
+                openwakeword.utils.download_models()
+                self.model = Model(wakeword_models=[str(model_path)], inference_framework="onnx" if model_path.suffix == ".onnx" else "tflite")
+                
             self.model_name = model_path
             logging.info("Loaded wake-word model: %s", model_path)
-
-    @property
-    def enabled(self) -> bool:
-        """Check whether a wake-word model is ready for inference.
-
-        Returns:
-            ``True`` if a model is loaded; otherwise, ``False``.
-        """
-        return self.model is not None
+        
+        return
 
     def detect(self, mono_audio: np.ndarray) -> tuple[bool, float]:
         """Run wake-word detection on a mono audio frame.
@@ -56,29 +65,31 @@ class WakeWordDetector:
             * mono_audio : Mono float audio samples for detection.
 
         Returns:
-            A pair containing whether a threshold-crossing trigger occurred and
+            A tuple containing whether a threshold-crossing trigger occurred and
             the highest model score for this input.
         """
-        if self.model is None:
-            return False, 0.0
-        mono = np.asarray(mono_audio, dtype=np.float32).reshape(-1)
-        pcm = np.clip(mono * 32767.0, -32768, 32767).astype(np.int16)
-        # openWakeWord accepts 16 kHz, 16-bit PCM frames; buffering here means
-        # callers may use a frame size other than the model's usual 80 ms.
-        if not hasattr(self, "_pending"):
-            self._pending = np.empty(0, dtype=np.int16)
-        self._pending = np.concatenate((self._pending, pcm))
         event = False
         best_score = 0.0
-        chunk_samples = 1280
-        while self._pending.size >= chunk_samples:
-            chunk = self._pending[:chunk_samples]
-            self._pending = self._pending[chunk_samples:]
-            scores = self.model.predict(chunk)
-            score = max((float(v) for v in scores.values()), default=0.0)
-            best_score = max(best_score, score)
-            now = time.monotonic()
-            if score >= self.threshold and now - self.last_trigger >= self.cooldown_seconds:
-                event = True
-                self.last_trigger = now
+        
+        if self.model is not None:
+            mono = np.asarray(mono_audio, dtype=np.float32).reshape(-1)
+            pcm = np.clip(mono * 32767.0, -32768, 32767).astype(np.int16)
+            # openWakeWord accepts 16 kHz, 16-bit PCM frames; buffering here means
+            # callers may use a frame size other than the model's usual 80 ms.
+            if not hasattr(self, "_pending"):
+                self._pending = np.empty(0, dtype=np.int16)
+            self._pending = np.concatenate((self._pending, pcm))
+            
+            chunk_samples = 1280
+            while self._pending.size >= chunk_samples:
+                chunk = self._pending[:chunk_samples]
+                self._pending = self._pending[chunk_samples:]
+                scores = self.model.predict(chunk)
+                score = max((float(v) for v in scores.values()), default=0.0)
+                best_score = max(best_score, score)
+                now = time.monotonic()
+                if score >= self.threshold and now - self.last_trigger >= self.cooldown_seconds:
+                    event = True
+                    self.last_trigger = now
+        
         return event, best_score

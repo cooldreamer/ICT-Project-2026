@@ -176,20 +176,23 @@ def main() -> int:
         if isinstance(device, str) and device.isdigit():
             device = int(device)
         
+        if args.wakeword_model is not None: args.wakeword_model = Path(args.wakeword_model)
+        if args.database is not None: args.database = Path(args.database)
+        
         # Set up the configuration settings object.  
         # (Note that special behaviour had to be written to make the default/JSON supplied values supersede empty argument entries.)
         config = AppConfig(
             **{key: value for key, value in {
                 "use_xvf3800_mic_model": not args.use_general_mic_model,
                 "_microphone_positions_m": positions,
-                "wakeword_model_path": Path(args.wakeword_model),
+                "wakeword_model_path": args.wakeword_model,
                 "stt_model": args.stt_model,
                 "stt_device": args.stt_device,
                 "stt_compute_type": args.stt_compute_type,
                 "accent_model_path": args.accent_model,
                 "robot_endpoint": args.robot_endpoint,
                 "server_endpoint": args.server_endpoint,
-                "database_path": Path(args.database),
+                "database_path": args.database,
                 "log_level": args.log_level
             }.items() if value is not None}
         )
