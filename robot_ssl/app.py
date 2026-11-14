@@ -222,7 +222,6 @@ class RobotAudioApp:
 
         try:
             print("# channels:", self.config.input_channels)
-            print(sd.query_devices())
             with sd.InputStream(
                 samplerate=self.config.sample_rate,
                 channels=self.config.input_channels,

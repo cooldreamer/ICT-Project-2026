@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", help="Input device index (run --list-devices to inspect devices)")
     parser.add_argument("--use-general-mic-model", action="store_true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
     parser.add_argument("--mic-geometry", help="JSON file containing microphone positions in metres, channel order; format: [[x,y], ...]")
-    parser.add_argument("--wakeword-model", help="Path to an openWakeWord ONNX/TFLite model; if omitted, transcript wake phrases are used")
+    parser.add_argument("--wakeword-model", help="Path to an openWakeWord ONNX/TFLite model; if omitted, default model is used")
     parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases") # this should probably be taken out, since it's sort of the antithesis of how the program works
     parser.add_argument("--stt-model", default="base", help="faster-whisper model size/path (e.g. tiny, base, small)")
     parser.add_argument("--stt-device", default="cpu", choices=("cpu", "cuda"), help="faster-whisper inference device")

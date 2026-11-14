@@ -7,7 +7,6 @@ from typing import Tuple # for type declaration of variables as a Tuple
 import warnings # for raising warnings for less critical issues in the project's operation
 import json # for loading and reading a json file into a dictionary
 
-print(__name__)
 # Microphone Indices class
 if not __name__.startswith("robot_ssl"):
     from config_ext.extMicIndices import MicIndices

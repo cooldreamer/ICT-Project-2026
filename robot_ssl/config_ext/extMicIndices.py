@@ -77,7 +77,6 @@ class MicIndices:
     
     def __len__(self):
         tempflatlist = self._getFlatMicIntList()
-        print(tempflatlist)
         #return sum(tempflatlist if any(x is not None for x in tempflatlist) else [0]) # this adds all the mic indices together - not so useful, whoops!
         return len(tempflatlist)
     
