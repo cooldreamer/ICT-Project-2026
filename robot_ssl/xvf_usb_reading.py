@@ -3,6 +3,7 @@
 import struct # for neat structuring of binary data
 import time # for delaying the main loop (just time.sleep())
 import traceback # for printing the full traceback of exceptions
+import sys # for tracking the operating system used so that the correct USB library can be selected
 
  # for the efficient and safe handling of USB device connections
 import libusb_package # Windows (a wrapper for libusb, a C library that provides generic access to USB devices)
@@ -12,15 +13,15 @@ import usb # Mac/Linux (pyusb, a Python library that provides easy access to USB
 # If the script is run directly, it cannot natively access the config module; adjustment to the import path is needed to include the parent directory
 # (Note: Since this is a test script using an alternative method for reading the microphone array, we do not want to import the full robot app module)
 if not __name__.startswith("robotssl"):
-    if __name__ == "__main__":
-        import sys
-        from pathlib import Path
+    # if __name__ == "__main__":
+    #     import sys
+    #     from pathlib import Path
 
-        # Get the absolute path of the directory two levels up
-        parent_dir = Path(__file__).resolve().parent.parent
-
-        # Add it to the path
-        sys.path.insert(0, str(parent_dir))
+    #     # Get the absolute path of the directory two levels up
+    #     parent_dir = Path(__file__).resolve().parent.parent
+        
+    #     # Add it to the path
+    #     sys.path.insert(0, str(parent_dir))
 
     # Now import normally
     from config import AppConfig 
@@ -158,6 +159,11 @@ class reSpeaker:
         """
         usb.util.dispose_resources(self.dev)
         return
+    
+    def getDOAValue(self):
+        doa_response = self.read("DOA_VALUE")
+        return {"doa_angle": doa_response[0] if doa_response else None, 
+                "speech_active": doa_response[1] if doa_response and len(doa_response) > 1 else None}
 
 def find(vid=0x2886, pid=0x001A):
     """Find the XVF3800 by USB vendor/product ID.
@@ -198,11 +204,9 @@ def main():
         
         try:
             while True:
-                result = dev.read("DOA_VALUE")
-                doa_angle = result[0] if result else None
-                speech_active = result[1] if result and len(result) > 1 else None
+                result = dev.getDOAValue()
                 
-                print(f"SPEECH_DETECTED: {speech_active}, DOA_VALUE: {doa_angle}")
+                print(f"SPEECH_DETECTED: {result["speech_active"]}, DOA_VALUE: {result["doa_angle"]}")
                 
                 time.sleep(0.1)
         except KeyboardInterrupt:

@@ -7,7 +7,7 @@ from pathlib import Path
 import queue
 import threading
 import time
-from turtle import position
+# from turtle import position
 import numpy as np
 
 from robot_ssl.app import RobotAudioApp

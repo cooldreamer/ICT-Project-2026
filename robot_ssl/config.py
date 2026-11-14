@@ -9,7 +9,7 @@ import json # for loading and reading a json file into a dictionary
 
 print(__name__)
 # Microphone Indices class
-if not __name__.startswith("robotssl"):
+if not __name__.startswith("robot_ssl"):
     from config_ext.extMicIndices import MicIndices
 else:
     from robot_ssl.config_ext.extMicIndices import MicIndices
@@ -95,11 +95,11 @@ class AppConfig:
     discovery_server_host = robot_hostname
     ros_domain_id = "9"
     
+    
     # XVF3800 usage-dependent properties
     @property
     def sample_rate(self):
         return XVF3800_SAMPLE_RATE if self.use_xvf3800_mic_model else self._sample_rate
-    
     
     @sample_rate.setter
     def sample_rate(self, val):
@@ -111,7 +111,6 @@ class AppConfig:
     def input_channels(self):
         return XVF3800_INPUT_CHANNELS if self.use_xvf3800_mic_model else self._input_channels
     
-    
     @input_channels.setter
     def input_channels(self, val):
         self._input_channels = val
@@ -122,7 +121,6 @@ class AppConfig:
     def microphone_positions_m(self):
         return XVF3800_MIC_POSITIONS if self.use_xvf3800_mic_model else self._microphone_positions_m
     
-    
     @microphone_positions_m.setter
     def microphone_positions_m(self, val):
         self._microphone_positions_m = val
@@ -132,7 +130,6 @@ class AppConfig:
     @property
     def microphone_channel_indices(self):
         return XVF3800_MIC_CHANNEL_INDICES if self.use_xvf3800_mic_model else self._microphone_channel_indices
-    
     
     @microphone_channel_indices.setter
     def microphone_channel_indices(self, val):
@@ -147,30 +144,14 @@ class AppConfig:
         return len(self.microphone_positions_m)
     
     
-    # property variables, to make interpreter shut up.  These values are all replaced immediately (in __post_init__)
-    # sample_rate = 0
-    # input_channels = 0
-    # microphone_positions_m = ()
-    # microphone_channel_indices = ()
-    
-    # channels = 0
-    
-    
     def __post_init__(self):
         """Apply JSON overrides to attributes.
 
         Returns:
             None.
         """
-        # self.load_properties() # interpreter hates this but it works (note: it doesn't actually work)
-        # self.channels = property(lambda self: len(self.microphone_positions_m))
-        
         json_settings = self.load_json()
         if json_settings:
-            # Replace property JSON entries with attribute JSON entries, to preserve property behaviour correctly
-            # (theoretically not needed after adding the property setters, saving us a loop)
-            # json_settings = dict([(f"_{key}" if key in self.property_connections else key, value) for key, value in json_settings.items()])
-            
             # Load JSON settings into AppConfig attributes
             # (Note 1: the way this is loaded, the last entry to share the name of an attribute will be ultimately used)
             # (Note 2: since this is done in __post_init__, the JSON settings will override any values set in the constructor)
@@ -197,25 +178,6 @@ class AppConfig:
         return json_settings
     
     
-    # def load_properties(self):
-    #     """Load dynamic values for the XVF3800 usage-dependent open-facing properties.
-        
-    #     Bind device-dependent settings to the active microphone profile.
-
-    #     With the XVF3800 profile enabled, public settings read from module constants.
-    #     Otherwise, they read from their underscored instance fields.
-
-    #     Returns:
-    #         None.
-    #     """
-    #     for setting_name, setting_val in [(a,b) for a,b in self.property_connections.items() if a in dir(self)]:
-    #         setattr(self, setting_name, 
-    #                 property(
-    #                     lambda self: globals()[setting_val] if self.use_xvf3800_mic_model else getattr(self, f"_{setting_name}"), 
-    #                     lambda self, x: setattr(self, f"_{setting_name}", x)))
-    #     return
-    
-    
     def validate(self) -> None:
         """Validate microphone and processing settings.
 
@@ -235,7 +197,7 @@ class AppConfig:
         if self.frame_samples <= 0:
             raise ValueError("frame_samples must be a positive integer")
         
-        if len(self.microphone_positions_m) < 1: # type: ignore
+        if len(self.microphone_positions_m) < 1:
             raise ValueError("At least one input must be present")
         
         if self.input_channels < 1:

@@ -5,7 +5,7 @@ import queue
 import re
 import threading
 import time
-from typing import Any
+from typing import Any, Tuple
 import numpy as np
 
 from robot_ssl.attention import AttentionMaintenanceSystem
@@ -18,7 +18,7 @@ from robot_ssl.audio.wakeword import WakeWordDetector
 from robot_ssl.config import AppConfig
 from robot_ssl.interfaces.robot import ConsoleRobotInterface, HttpRobotInterface, RobotMovementInterface
 from robot_ssl.interfaces.server import ServerInterface
-from robot_ssl.models import AudioSegment, VoiceTraits
+from robot_ssl.models import AudioSegment, VoiceTraits # VoiceTraits is a settings class which does not seem to be being used, hmm...
 from robot_ssl.services.health import HealthMonitor
 from robot_ssl.services.storage import DatabaseStore
 
@@ -156,7 +156,7 @@ class RobotAudioApp:
                     pass
         return published
 
-    def _has_text_wakeword(self, text: str) -> bool:
+    def _hasTextWakeword(self, text: str) -> bool:
         """Check whether transcript text contains a configured wake phrase.
 
         Parameters:
@@ -169,6 +169,29 @@ class RobotAudioApp:
         lowered = re.sub(r"\s+", " ", lowered).strip()
         return any(re.search(rf"\b{re.escape(phrase)}\b", lowered) for phrase in self.wake_phrases)
     
+    
+    def _splitAudioData(self, frame_data) -> Tuple[np.ndarray | None, np.ndarray | None, np.ndarray]:
+        """Splits audio frame data into asr, sum and raw mics depending on config settings.
+        
+        Parameters:
+            * frame_data : Raw audio data in all channels.
+
+        Returns:
+            Tuple of 3 Numpy arrays: 
+            * ASR (automatic speech recognition) (1D array)
+            * sum (total single channel audio input) (1D array)
+            * mics/raw (all raw mic inputs) (2D array)
+        """
+        asr_frame, sum_frame, mics_frame = None, None, None
+        if self.config.microphone_channel_indices.asr is not None:
+            asr_frame = frame_data[:, self.config.microphone_channel_indices.asr]
+        if self.config.microphone_channel_indices.sum is not None:
+            sum_frame = frame_data[:, self.config.microphone_channel_indices.sum]
+        mics_frame = frame_data[:, self.config.microphone_channel_indices.raw]
+        
+        return (asr_frame, sum_frame, mics_frame)
+
+
     # To Do: 
     # * Only reference `raw` channels.
     # * Replace direct sounddevice interface with specialised reSpeaker XVF3800 interface library
@@ -189,7 +212,7 @@ class RobotAudioApp:
             self._publish({"type": "error", "message": "Missing sounddevice. Install requirements.txt first."})
             raise RuntimeError("Missing dependency: sounddevice; run `pip install -r requirements.txt`") from exc
 
-        worker = threading.Thread(target=self._segment_worker, name="speech-segment-worker", daemon=True)
+        worker = threading.Thread(target=self._segmentWorker, name="speech-segment-worker", daemon=True)
         worker.start()
         self.robot.set_alertness("idle", "audio perception starting")
         self._publish({
@@ -198,7 +221,8 @@ class RobotAudioApp:
         })
 
         try:
-            print("# channels:", self.config.raw_channels)
+            print("# channels:", self.config.input_channels)
+            print(sd.query_devices())
             with sd.InputStream(
                 samplerate=self.config.sample_rate,
                 channels=self.config.input_channels,
@@ -211,7 +235,10 @@ class RobotAudioApp:
                     raw_frame, overflowed = stream.read(self.config.frame_samples)
                     if overflowed:
                         self.health.audio_overflows += 1
-                    cleaned = self.cleaner.clean(raw_frame)
+                    
+                    asr_frame, sum_frame, mics_frame = self._splitAudioData(raw_frame)
+                    
+                    cleaned = self.cleaner.clean(mics_frame)
                     features = extract_frame_features(cleaned, self.config.sample_rate)
                     per_channel_rms = np.sqrt(np.mean(cleaned.astype(np.float64) ** 2, axis=0))
                     wake_mono = cleaned[:, int(np.argmax(per_channel_rms))]
@@ -269,7 +296,7 @@ class RobotAudioApp:
             self.store.close()
             self.robot.set_alertness("idle", "audio perception stopped")
 
-    def _segment_worker(self) -> None:
+    def _segmentWorker(self) -> None:
         """Load optional speech models and process queued segments until shutdown.
 
         Returns:
@@ -292,14 +319,14 @@ class RobotAudioApp:
             except queue.Empty:
                 continue
             try:
-                self._handle_segment(segment, stt, accent_classifier)
+                self._handleSegment(segment, stt, accent_classifier)
             except Exception:
                 logging.exception("Could not process speech segment")
                 self._publish({"type": "error", "message": "Could not process one speech segment; see log for details."})
             finally:
                 self.segment_queue.task_done()
 
-    def _handle_segment(self, segment: AudioSegment, stt: SpeechToText, accent_classifier: AccentClassifier) -> None:
+    def _handleSegment(self, segment: AudioSegment, stt: SpeechToText, accent_classifier: AccentClassifier) -> None:
         """Analyze an utterance, update attention, and publish its event.
 
         Parameters:
@@ -325,7 +352,7 @@ class RobotAudioApp:
             traits.accent_guess = "unknown (accent model prediction failed)"
             traits.accent_confidence = None
 
-        text_wakeword = self._has_text_wakeword(text)
+        text_wakeword = self._hasTextWakeword(text)
         wakeword_confirmed = bool(segment.wakeword_detected or text_wakeword)
         if wakeword_confirmed:
             score = 1.0
