@@ -41,6 +41,7 @@ class reSpeaker:
 
     TIMEOUT = 10_000 # USB timeout - 10 seconds
     
+    
     def __init__(self, dev, config: AppConfig):
         """Wrap an already-discovered USB device and its application config.
 
@@ -61,6 +62,7 @@ class reSpeaker:
         
         # self.open_device()
         return
+    
     
     def write(self, name, data_list):
         """Write a supported writable parameter using its configured encoding.
@@ -102,6 +104,7 @@ class reSpeaker:
             self.dev.ctrl_transfer(usb.util.CTRL_OUT | usb.util.CTRL_TYPE_VENDOR | usb.util.CTRL_RECIPIENT_DEVICE, 0, wvalue, windex, payload, timeout=self.TIMEOUT)
         
         return
+    
     
     def read(self, name):
         """Read a supported parameter and decode its response values.
@@ -151,6 +154,7 @@ class reSpeaker:
         
         return result
     
+    
     def close(self):
         """Release resources associated with the USB device.
 
@@ -160,10 +164,12 @@ class reSpeaker:
         usb.util.dispose_resources(self.dev)
         return
     
+    
     def getDOAValue(self):
         doa_response = self.read("DOA_VALUE")
         return {"doa_angle": doa_response[0] if doa_response else None, 
                 "speech_active": doa_response[1] if doa_response and len(doa_response) > 1 else None}
+
 
 def find(vid=0x2886, pid=0x001A):
     """Find the XVF3800 by USB vendor/product ID.
@@ -189,6 +195,7 @@ def find(vid=0x2886, pid=0x001A):
     #     dev.detach_kernel_driver(0)
     # usb.util.claim_interface(dev, 0)
     return reSpeaker(dev, AppConfig())
+
 
 def main():
     """Read and print microphone firmware and direction-of-arrival values.
@@ -223,6 +230,9 @@ def main():
         print(traceback.format_exc())
     finally:
         dev.close() if 'dev' in locals() and type(dev).__name__ == 'reSpeaker' else None
-        
+    
+    return
+
+
 if __name__ == "__main__":
     main()

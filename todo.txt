@@ -1,3 +1,6 @@
 * Tidy up modules
- ** Get the console working as fast as possible
+ ** Get program to auto select XVF microphone
+ ** Get TTS working
 * Complete adding comments to extMicIndices.py
+* Complete adding comments to main.py
+* Move try-excepts for imports to top and readjust program accordingly

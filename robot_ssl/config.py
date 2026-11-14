@@ -2,7 +2,7 @@
 Includes definitions for default/XVF3800-specific values and the managing AppConfig class."""
 
 from dataclasses import dataclass # for templating of the configuration module into an attribute-centred class
-from pathlib import Path # for storing the path to the sqlite database
+from pathlib import Path # for storing the paths to files
 from typing import Tuple # for type declaration of variables as a Tuple
 import warnings # for raising warnings for less critical issues in the project's operation
 import json # for loading and reading a json file into a dictionary
@@ -80,7 +80,7 @@ class AppConfig:
     stt_model: str = "base"
     stt_device: str = "cpu"
     stt_compute_type: str = "int8"
-    wakeword_model_path: str | None = None
+    wakeword_model_path: Path | None = Path("data/hey_jarvis_v0.1.onnx")
     accent_model_path: str | None = None
     
     robot_endpoint: str | None = None

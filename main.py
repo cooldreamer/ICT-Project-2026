@@ -7,7 +7,6 @@ from pathlib import Path
 import queue
 import threading
 import time
-# from turtle import position
 import numpy as np
 
 from robot_ssl.app import RobotAudioApp
@@ -27,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Robot sound source localisation, wake-word, and speech attention pipeline")
     parser.add_argument("--device", help="Input device index (run --list-devices to inspect devices)")
-    parser.add_argument("--use-general-mic-model", default="true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
+    parser.add_argument("--use-general-mic-model", action="store_true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
     parser.add_argument("--mic-geometry", help="JSON file containing microphone positions in metres, channel order; format: [[x,y], ...]")
     parser.add_argument("--wakeword-model", help="Path to an openWakeWord ONNX/TFLite model; if omitted, transcript wake phrases are used")
     parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases") # this should probably be taken out, since it's sort of the antithesis of how the program works
@@ -123,7 +122,9 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
         audio.append(np.fft.irfft(shifted_spectrum, n=n_samples))
     multichannel = np.column_stack(audio).astype(np.float32)
     localizer = SRPPHATLocalizer(positions, sample_rate=sample_rate, angle_step_degrees=1.0)
+    
     result = localizer.localize(multichannel)
+    
     if result is None:
         print("DoA demo failed: no usable localisation result")
         return 1
@@ -179,9 +180,9 @@ def main() -> int:
         # (Note that special behaviour had to be written to make the default/JSON supplied values supersede empty argument entries.)
         config = AppConfig(
             **{key: value for key, value in {
-                "use_xvf3800_mic_model": args.use_general_mic_model != "true",
+                "use_xvf3800_mic_model": not args.use_general_mic_model,
                 "_microphone_positions_m": positions,
-                "wakeword_model_path": args.wakeword_model,
+                "wakeword_model_path": Path(args.wakeword_model),
                 "stt_model": args.stt_model,
                 "stt_device": args.stt_device,
                 "stt_compute_type": args.stt_compute_type,
