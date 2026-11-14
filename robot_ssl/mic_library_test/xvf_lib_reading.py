@@ -11,20 +11,21 @@ import usb # Mac/Linux (pyusb, a Python library that provides easy access to USB
 # Project config settings (for microphone array, etc.)
 # If the script is run directly, it cannot natively access the config module; adjustment to the import path is needed to include the parent directory
 # (Note: Since this is a test script using an alternative method for reading the microphone array, we do not want to import the full robot app module)
-if __name__ == "__main__":
-    import sys
-    from pathlib import Path
+if not __name__.startswith("robotssl"):
+    if __name__ == "__main__":
+        import sys
+        from pathlib import Path
 
-    # Get the absolute path of the directory two levels up
-    parent_dir = Path(__file__).resolve().parent.parent
+        # Get the absolute path of the directory two levels up
+        parent_dir = Path(__file__).resolve().parent.parent
 
-    # Add it to the path
-    sys.path.insert(0, str(parent_dir))
+        # Add it to the path
+        sys.path.insert(0, str(parent_dir))
 
     # Now import normally
     from config import AppConfig 
 else:
-    from robot_ssl.config import AppConfig  
+    from robot_ssl.config import AppConfig
 
 PARAMETERS = {
     "VERSION": (48, 0, 3, "ro", "uint8"),

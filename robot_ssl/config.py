@@ -7,8 +7,9 @@ from typing import Tuple # for type declaration of variables as a Tuple
 import warnings # for raising warnings for less critical issues in the project's operation
 import json # for loading and reading a json file into a dictionary
 
+print(__name__)
 # Microphone Indices class
-if __name__ == "__main__":
+if not __name__.startswith("robotssl"):
     from config_ext.extMicIndices import MicIndices
 else:
     from robot_ssl.config_ext.extMicIndices import MicIndices
@@ -99,43 +100,52 @@ class AppConfig:
     def sample_rate(self):
         return XVF3800_SAMPLE_RATE if self.use_xvf3800_mic_model else self._sample_rate
     
+    
     @sample_rate.setter
     def sample_rate(self, val):
         self._sample_rate = val
         return
     
+    
     @property
     def input_channels(self):
         return XVF3800_INPUT_CHANNELS if self.use_xvf3800_mic_model else self._input_channels
+    
     
     @input_channels.setter
     def input_channels(self, val):
         self._input_channels = val
         return
     
+    
     @property
     def microphone_positions_m(self):
         return XVF3800_MIC_POSITIONS if self.use_xvf3800_mic_model else self._microphone_positions_m
+    
     
     @microphone_positions_m.setter
     def microphone_positions_m(self, val):
         self._microphone_positions_m = val
         return
 
+
     @property
     def microphone_channel_indices(self):
         return XVF3800_MIC_CHANNEL_INDICES if self.use_xvf3800_mic_model else self._microphone_channel_indices
+    
     
     @microphone_channel_indices.setter
     def microphone_channel_indices(self, val):
         self._microphone_channel_indices = val
         return
     
+    
     # alias property for reference simplification.  It has no setter as doing so would require declaring another mic coordinate explicitly.
     @property
-    def channels(self):
+    def raw_channels(self):
         # Compatibility alias for the number of geometry microphone channels.
         return len(self.microphone_positions_m)
+    
     
     # property variables, to make interpreter shut up.  These values are all replaced immediately (in __post_init__)
     # sample_rate = 0
@@ -144,6 +154,7 @@ class AppConfig:
     # microphone_channel_indices = ()
     
     # channels = 0
+    
     
     def __post_init__(self):
         """Apply JSON overrides to attributes.
@@ -168,7 +179,8 @@ class AppConfig:
                 setattr(self, setting_name, setting_val)
         
         return
-        
+    
+    
     def load_json(self):
         """Load settings from ``robot_ssl/config.json`` if it exists.
 
@@ -183,6 +195,7 @@ class AppConfig:
             print("JSON config file not found.  Using command args or default settings.")
         
         return json_settings
+    
     
     # def load_properties(self):
     #     """Load dynamic values for the XVF3800 usage-dependent open-facing properties.
@@ -201,7 +214,8 @@ class AppConfig:
     #                     lambda self: globals()[setting_val] if self.use_xvf3800_mic_model else getattr(self, f"_{setting_name}"), 
     #                     lambda self, x: setattr(self, f"_{setting_name}", x)))
     #     return
-
+    
+    
     def validate(self) -> None:
         """Validate microphone and processing settings.
 

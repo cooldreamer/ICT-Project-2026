@@ -1,8 +1,6 @@
-"""Application wiring for the complete robot audio-perception pipeline."""
+"""Application operation for the primary part of the robot audio-perception pipeline."""
 
-from collections import Counter
 import logging
-import math
 import queue
 import re
 import threading
@@ -78,18 +76,21 @@ class RobotAudioApp:
         self.stop_event = stop_event or threading.Event()
         self.device = device
         self.wake_phrases = tuple(p.lower().strip() for p in wake_phrases if p.strip())
-        self.cleaner = AudioCleaner(config.sample_rate, config.channels)
+        self.cleaner = AudioCleaner(config.sample_rate, config.raw_channels)
+        
         self.localizer = SRPPHATLocalizer(
             config.microphone_positions_m,
             sample_rate=config.sample_rate,
             speed_of_sound_m_s=config.speed_of_sound_m_s,
             angle_step_degrees=config.doa_step_degrees,
         )
+        
         self.beamformer = DelayAndSumBeamformer(
             config.microphone_positions_m,
             sample_rate=config.sample_rate,
             speed_of_sound_m_s=config.speed_of_sound_m_s,
         )
+        
         self.segmenter = SpeechSegmenter(
             sample_rate=config.sample_rate,
             frame_samples=config.frame_samples,
@@ -100,49 +101,60 @@ class RobotAudioApp:
             min_speech_seconds=config.vad_min_speech_seconds,
             max_segment_seconds=config.vad_max_segment_seconds,
         )
+        
         self.wakeword = WakeWordDetector(
             config.wakeword_model_path,
             threshold=config.wakeword_threshold,
             cooldown_seconds=config.wakeword_cooldown_seconds,
         )
+        
         self.attention = AttentionMaintenanceSystem(
             timeout_seconds=config.session_timeout_seconds,
             angle_tolerance_degrees=config.subject_angle_tolerance_degrees,
         )
+        
         self.robot: RobotMovementInterface = (
-            HttpRobotInterface(config.robot_endpoint)
-            if config.robot_endpoint
-            else ConsoleRobotInterface()
+            HttpRobotInterface(config.robot_endpoint) if config.robot_endpoint else ConsoleRobotInterface()
         )
         self.server = ServerInterface(config.server_endpoint)
         self.store = DatabaseStore(config.database_path)
         self.health = HealthMonitor()
+        
         self.segment_queue: queue.Queue[AudioSegment] = queue.Queue(maxsize=6)
+        
         self.last_azimuth: float | None = None
         self.last_doa_confidence: float = 0.0
         self.last_wakeword_score: float = 0.0
+        
         self.last_ui_publish = 0.0
+        
+        return
 
-    def _publish(self, event: dict[str, Any]) -> None:
+    def _publish(self, event: dict[str, Any]) -> bool:
         """Publish an event to the optional UI queue without blocking capture.
 
         Parameters:
             * event : Event dictionary to publish.
 
         Returns:
-            None.
+            Success state of event publishing attempt.
         """
+        
+        published = False
         if self.event_queue is not None:
             try:
                 self.event_queue.put_nowait(event)
+                published = True
             except queue.Full:
                 # Telemetry is expendable; discard its oldest queued item rather
                 # than block microphone processing on a slow UI.
                 try:
                     self.event_queue.get_nowait()
                     self.event_queue.put_nowait(event)
+                    published = True
                 except (queue.Empty, queue.Full):
                     pass
+        return published
 
     def _has_text_wakeword(self, text: str) -> bool:
         """Check whether transcript text contains a configured wake phrase.
@@ -151,14 +163,14 @@ class RobotAudioApp:
             * text : Transcribed speech to search.
 
         Returns:
-            ``True`` if a configured phrase is present; otherwise, ``False``.
+            Configured phrase present state.
         """
         lowered = re.sub(r"[^a-z0-9\s]", " ", text.lower())
         lowered = re.sub(r"\s+", " ", lowered).strip()
         return any(re.search(rf"\b{re.escape(phrase)}\b", lowered) for phrase in self.wake_phrases)
     
     # To Do: 
-    # * Separate first/second and third-sixth channels for DoA and wakeword detection
+    # * Only reference `raw` channels.
     # * Replace direct sounddevice interface with specialised reSpeaker XVF3800 interface library
     def run(self) -> None:
         """Capture microphone frames and enqueue completed speech segments.
@@ -186,15 +198,15 @@ class RobotAudioApp:
         })
 
         try:
-            print("# channels:", self.config.channels)
+            print("# channels:", self.config.raw_channels)
             with sd.InputStream(
                 samplerate=self.config.sample_rate,
-                channels=self.config.channels,
+                channels=self.config.input_channels,
                 blocksize=self.config.frame_samples,
                 dtype="float32",
                 device=self.device,
             ) as stream:
-                logging.info("Audio stream started: %s Hz, %s channels", self.config.sample_rate, self.config.channels)
+                logging.info("Audio stream started: %s Hz, %s channels", self.config.sample_rate, self.config.input_channels)
                 while not self.stop_event.is_set():
                     raw_frame, overflowed = stream.read(self.config.frame_samples)
                     if overflowed:
@@ -209,7 +221,7 @@ class RobotAudioApp:
                     doa_angle: float | None = None
                     doa_confidence: float | None = None
                     # Avoid spending CPU localising very quiet frames.
-                    if self.config.channels >= 2 and features.rms >= self.config.vad_min_rms * 0.5:
+                    if self.config.raw_channels >= 2 and features.rms >= self.config.vad_min_rms * 0.5:
                         result = self.localizer.localize(cleaned)
                         if result is not None:
                             doa_angle = result.azimuth_degrees

@@ -1,3 +1,5 @@
+"""Microphone indices class definition."""
+
 from typing import Iterable, Tuple, List # for type declaration of variables as a Tuple
 import warnings # for raising warnings for less critical issues
 
@@ -35,6 +37,7 @@ class MicIndices:
             warnings.warn("Extra index types detected - collapsing all to 'unk'")
             self.unk = [item for unkkey in kwargskeys for item in (kwargs[unkkey] if isinstance(kwargs[unkkey], Iterable) else [kwargs[unkkey]])] # type: ignore (Intellisense is just being really dumb here lol)
         return
+          
                 
     def checkargtype(self, argname, arg, mustbetype: str = "either"):
         """Verify an argument value input follows the necessary rules for its argument.
@@ -63,11 +66,14 @@ class MicIndices:
         
         return True
     
+    
     def __str__(self):
         return f"asr: {self.asr}; sum: {self.sum}; raw: {self.raw}; unk: {self.unk}"
     
+    
     def _getFlatMicIntList(self):
        return list([x for x in [item for sublist in [self.asr, self.sum, self.raw, self.unk] for item in (sublist if isinstance(sublist, Iterable) else [sublist])] if x is not None])
+    
     
     def __len__(self):
         tempflatlist = self._getFlatMicIntList()
@@ -75,12 +81,14 @@ class MicIndices:
         #return sum(tempflatlist if any(x is not None for x in tempflatlist) else [0]) # this adds all the mic indices together - not so useful, whoops!
         return len(tempflatlist)
     
+    
     def checkMicUniqueness(self):
         uniqueness = True
         uniquemicset = set(self._getFlatMicIntList())
         if uniquemicset is not None and len(uniquemicset) != len(self):
             uniqueness = False
         return uniqueness
+    
     
     def checkMicBounds(self, upper):
         boundedness = True

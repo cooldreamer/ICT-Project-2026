@@ -1,4 +1,4 @@
-"""Manage the operation of the entire program."""
+"""Operation management for the entire program."""
 
 import argparse # for console-level argument parsing
 import json # for loading and reading json files into dictionaries
@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-general-mic-model", default="true", help="Forces program to use a general microphone model instead of the expected reSpeaker XVF3800 model")
     parser.add_argument("--mic-geometry", help="JSON file containing microphone positions in metres, channel order; format: [[x,y], ...]")
     parser.add_argument("--wakeword-model", help="Path to an openWakeWord ONNX/TFLite model; if omitted, transcript wake phrases are used")
-    parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases") # what does this mean
+    parser.add_argument("--wake-phrases", default="hey robot,hello robot,robot", help="Comma-separated transcript fallback phrases") # this should probably be taken out, since it's sort of the antithesis of how the program works
     parser.add_argument("--stt-model", default="base", help="faster-whisper model size/path (e.g. tiny, base, small)")
     parser.add_argument("--stt-device", default="cpu", choices=("cpu", "cuda"), help="faster-whisper inference device")
     parser.add_argument("--stt-compute-type", default="int8", help="faster-whisper compute type, e.g. int8 or float16")
@@ -131,6 +131,11 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
     error = abs((result.azimuth_degrees - expected_angle + 180.0) % 360.0 - 180.0)
     print(f"Absolute azimuth error: {error:.1f}°")
     return 0 if error <= 8.0 else 1
+
+### ~~~~~~~~~~~~~~~~~~~~~~~~ ###
+### ~~~|------MAIN------|~~~ ###
+### ~~~~~~~~~~~~~~~~~~~~~~~~ ###
+
 
 def main() -> int:
     """Run the program depending on what command line arguments have been set.
