@@ -6,7 +6,9 @@ import re
 import threading
 import time
 from typing import Any, Tuple
+from narwhals import Float32
 import numpy as np
+from numpy.typing import NDArray
 
 from robot_ssl.attention import AttentionMaintenanceSystem
 from robot_ssl.audio.beamformer import DelayAndSumBeamformer
@@ -170,7 +172,7 @@ class RobotAudioApp:
         return any(re.search(rf"\b{re.escape(phrase)}\b", lowered) for phrase in self.wake_phrases)
     
     
-    def _splitAudioData(self, frame_data) -> Tuple[np.ndarray | None, np.ndarray | None, np.ndarray]:
+    def _splitAudioData(self, frame_data) -> Tuple[NDArray[np.float32] | None, NDArray[np.float32] | None, np.ndarray]:
         """Splits audio frame data into asr, sum and raw mics depending on config settings.
         
         Parameters:
@@ -228,6 +230,7 @@ class RobotAudioApp:
                 dtype="float32",
                 device=self.device,
             ) as stream:
+                
                 logging.info("Audio stream started: %s Hz, %s channels", self.config.sample_rate, self.config.input_channels)
                 while not self.stop_event.is_set():
                     raw_frame, overflowed = stream.read(self.config.frame_samples)
@@ -242,10 +245,15 @@ class RobotAudioApp:
                     wake_mono = cleaned[:, int(np.argmax(per_channel_rms))]
                     wakeword_detected, wake_score = self.wakeword.detect(wake_mono)
                     self.last_wakeword_score = wake_score
-
+                    
                     doa_angle: float | None = None
                     doa_confidence: float | None = None
                     # Avoid spending CPU localising very quiet frames.
+                    # print(self.config.raw_channels)
+                    # print(f"{features.rms:.8f}")
+                    # print(f"{self.config.vad_min_rms:.8f}")
+                    # print()
+                    
                     if self.config.raw_channels >= 2 and features.rms >= self.config.vad_min_rms * 0.5:
                         result = self.localizer.localize(cleaned)
                         if result is not None:
@@ -282,6 +290,7 @@ class RobotAudioApp:
                             "health": self.health.snapshot(),
                         })
                         self.last_ui_publish = now
+        
         except KeyboardInterrupt:
             logging.info("Keyboard interrupt received")
         except Exception as exc:
@@ -293,6 +302,8 @@ class RobotAudioApp:
             worker.join()
             self.store.close()
             self.robot.set_alertness("idle", "audio perception stopped")
+        
+        return
 
     def _segmentWorker(self) -> None:
         """Load optional speech models and process queued segments until shutdown.
@@ -310,12 +321,14 @@ class RobotAudioApp:
         except Exception:
             logging.exception("Could not load accent classifier; using unknown labels")
             accent_classifier = AccentClassifier()
-
+        
         while not self.stop_event.is_set() or not self.segment_queue.empty():
             try:
+                #print(self.segment_queue.qsize())
                 segment = self.segment_queue.get(timeout=0.2)
             except queue.Empty:
                 continue
+            
             try:
                 self._handleSegment(segment, stt, accent_classifier)
             except Exception:

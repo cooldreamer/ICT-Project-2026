@@ -38,7 +38,11 @@ class AudioCleaner:
         self.channels = channels
         upper_hz = min(7_500.0, sample_rate * 0.45)
         self.sos = butter(4, [80.0, upper_hz], btype="bandpass", fs=sample_rate, output="sos")
-        self.zi = np.zeros((self.sos.shape[0], 2, channels), dtype=np.float64)
+        self.zi = None
+        if isinstance(self.sos, np.ndarray):
+            self.zi = np.zeros((self.sos.shape[0], 2, channels), dtype=np.float64)
+        
+        return
 
     def clean(self, frame: np.ndarray) -> np.ndarray:
         """Sanitize, clip, and band-pass filter one audio frame.

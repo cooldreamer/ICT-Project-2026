@@ -6,6 +6,16 @@ import numpy as np
 
 class SpeechToText:
     """Optional faster-whisper adapter for utterance transcription."""
+    
+    @property
+    def available(self) -> bool:
+        """Check whether the speech-recognition model loaded successfully.
+
+        Returns:
+            Model availability.
+        """
+        return self.model is not None
+    
 
     def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8") -> None:
         """Attempt to load a Whisper model with the requested runtime settings.
@@ -18,6 +28,9 @@ class SpeechToText:
         Returns:
             None.
         """
+        
+        print("THIS IS A TEST - STT HAS RUN")
+        
         self.model = None
         self.error: str | None = None
         try:
@@ -28,14 +41,6 @@ class SpeechToText:
             self.error = f"STT unavailable: {exc}"
             logging.warning(self.error)
 
-    @property
-    def available(self) -> bool:
-        """Check whether the speech-recognition model loaded successfully.
-
-        Returns:
-            ``True`` if the model is available; otherwise, ``False``.
-        """
-        return self.model is not None
 
     def transcribe(self, audio: np.ndarray) -> tuple[str, str | None]:
         """Transcribe mono audio.
@@ -50,6 +55,7 @@ class SpeechToText:
         """
         if self.model is None:
             return "", None
+        
         signal = np.asarray(audio, dtype=np.float32).reshape(-1)
         if signal.size < 2_000:
             return "", None
@@ -60,5 +66,6 @@ class SpeechToText:
             condition_on_previous_text=False,
             beam_size=3,
         )
+        
         text = " ".join(segment.text.strip() for segment in segments).strip()
         return text, getattr(info, "language", None)

@@ -56,7 +56,7 @@ class Dashboard:
         ttk.Label(outer, text="Latest utterances", font=("TkDefaultFont", 11, "bold")).pack(anchor="w", pady=(12, 4))
         self.output = tk.Text(outer, height=15, wrap="word", state="disabled")
         self.output.pack(fill="both", expand=True)
-        self.root.after(100, self._poll_events)
+        self.root.after(100, self._pollEvents)
 
     def _append(self, text: str) -> None:
         """Append a message to the read-only utterance history widget.
@@ -72,49 +72,59 @@ class Dashboard:
         self.output.see("end")
         self.output.configure(state="disabled")
 
-    def _poll_events(self) -> None:
+    def _pollEvents(self) -> None:
         """Drain queued events and refresh the dashboard's visible state.
 
         Returns:
             None.
         """
-        while True:
+        
+        queue_not_empty = True
+        while queue_not_empty:
             try:
                 event = self.events.get_nowait()
             except queue.Empty:
-                break
-            event_type = event.get("type")
-            if event_type == "status":
-                self.status_var.set(event.get("message", "Ready"))
-            elif event_type == "error":
-                self.status_var.set("Warning: " + event.get("message", "unknown error"))
-                self._append("WARNING: " + event.get("message", "unknown error"))
-            elif event_type == "telemetry":
-                angle = event.get("azimuth_degrees")
-                self.azimuth_var.set(f"{angle:+.1f}°" if angle is not None else "unknown / insufficient signal")
-                self.confidence_var.set(f"{event.get('doa_confidence', 0.0):.2f}")
-                self.rms_var.set(f"{event.get('rms_dbfs', -120.0):.1f} dBFS")
-                self.wake_var.set(f"{event.get('wakeword_score', 0.0):.2f} / {'enabled' if event.get('wakeword_enabled') else 'text fallback'}")
-                self.attention_var.set("active" if event.get("attention_active") else "idle")
-                health = event.get("health", {})
-                self.health_var.set(
-                    f"{health.get('frames_per_second', 0)} fps; overflows={health.get('audio_overflows', 0)}; "
-                    f"dropped segments={health.get('dropped_segments', 0)}"
-                )
-            elif event_type == "segment":
-                angle = event.get("azimuth_degrees")
-                angle_text = f"{angle:+.1f}°" if angle is not None else "unknown direction"
-                traits = event.get("voice_traits", {})
-                self._append(
-                    f"Transcript: {event.get('transcript') or '[no STT transcript]'}\n"
-                    f"Direction: {angle_text} (score {event.get('doa_confidence', 0.0):.2f})\n"
-                    f"Wake word: {event.get('wakeword_detected')} | Addressed robot: {event.get('addressed_robot')} "
-                    f"| Attention score: {event.get('attention_score', 0.0):.2f}\n"
-                    f"Language: {event.get('language') or 'unknown'} | Accent: {traits.get('accent_guess', 'unknown')}\n"
-                    f"Traits: pitch={traits.get('pitch_median_hz')} Hz, centroid={traits.get('spectral_centroid_hz')} Hz"
-                )
+                queue_not_empty = False
+            
+            if queue_not_empty:
+                event_type = event.get("type")
+                if event_type == "status":
+                    self.status_var.set(event.get("message", "Ready"))
+                    
+                elif event_type == "error":
+                    self.status_var.set("Warning: " + event.get("message", "unknown error"))
+                    self._append("WARNING: " + event.get("message", "unknown error"))
+                    
+                elif event_type == "telemetry":
+                    angle = event.get("azimuth_degrees")
+                    self.azimuth_var.set(f"{angle:+.1f}°" if angle is not None else "unknown / insufficient signal")
+                    self.confidence_var.set(f"{event.get('doa_confidence', 0.0):.2f}")
+                    self.rms_var.set(f"{event.get('rms_dbfs', -120.0):.1f} dBFS")
+                    self.wake_var.set(f"{event.get('wakeword_score', 0.0):.2f} / {'enabled' if event.get('wakeword_enabled') else 'text fallback'}")
+                    self.attention_var.set("active" if event.get("attention_active") else "idle")
+                    health = event.get("health", {})
+                    self.health_var.set(
+                        f"{health.get('frames_per_second', 0)} fps; overflows={health.get('audio_overflows', 0)}; "
+                        f"dropped segments={health.get('dropped_segments', 0)}"
+                    )
+                    
+                elif event_type == "segment":
+                    angle = event.get("azimuth_degrees")
+                    angle_text = f"{angle:+.1f}°" if angle is not None else "unknown direction"
+                    traits = event.get("voice_traits", {})
+                    self._append(
+                        f"Transcript: {event.get('transcript') or '[no STT transcript]'}\n"
+                        f"Direction: {angle_text} (score {event.get('doa_confidence', 0.0):.2f})\n"
+                        f"Wake word: {event.get('wakeword_detected')} | Addressed robot: {event.get('addressed_robot')} "
+                        f"| Attention score: {event.get('attention_score', 0.0):.2f}\n"
+                        f"Language: {event.get('language') or 'unknown'} | Accent: {traits.get('accent_guess', 'unknown')}\n"
+                        f"Traits: pitch={traits.get('pitch_median_hz')} Hz, centroid={traits.get('spectral_centroid_hz')} Hz"
+                    )
+        
         if not self.stop_event.is_set():
-            self.root.after(100, self._poll_events)
+            self.root.after(100, self._pollEvents)
+        
+        return
 
     def close(self) -> None:
         """Signal pipeline shutdown and close the dashboard window.
@@ -124,6 +134,7 @@ class Dashboard:
         """
         self.stop_event.set()
         self.root.destroy()
+        return
 
     def run(self) -> None:
         """Run Tkinter's event loop until the window closes.
@@ -132,3 +143,4 @@ class Dashboard:
             None.
         """
         self.root.mainloop()
+        return
