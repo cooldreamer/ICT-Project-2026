@@ -1,178 +1,165 @@
 # RobotSSL - Sound Source Localisation & Attention (Python)
 
-An implementation of the requested robot audio-perception pipeline. It combines synchronised multichannel audio capture, SRP-PHAT-style direction-of-arrival (DoA) estimation, a delay-and-sum beamformer, optional wake-word ML, local speech-to-text, acoustic speech characteristics, an attention-session tracker, a robot movement adapter, optional server event forwarding, SQLite metadata storage, health counters, and a Tkinter dashboard.
+RobotSSL is a prototype robot audio-perception application. It captures synchronized multichannel audio, estimates a speaker's direction, detects speech and wake words, transcribes utterances, tracks short attention sessions, and records event metadata. It includes a Tkinter dashboard and experimental interfaces for robot communication.
 
-## 1. Pipeline overview
+Wake-word detection and speech-to-text are optional dependencies, but are **strongly recommended** for normal use: without them, the application loses acoustic wake-word detection or transcription-based interaction. The core audio capture, speech segmentation, and direction-estimation pipeline can run without either library.
+
+## How the application works
 
 ```text
-Synchronized mic array
-  -> Audio stream / input interface
-  -> Cleaning + frame features + energy VAD
-  -> SRP-PHAT azimuth estimation ------------------------------+
-  -> Wake-word model (optional)                                |
-  -> Speech segmenter                                          |
-       -> Direction-steered delay-and-sum beamformer <----------+
-       -> faster-whisper STT (optional)
-       -> Pitch / timbre-proxy features + optional accent model
-       -> Wake phrase + continued-subject speech scoring
-            -> Alertness state + camera/head orientation command
-            -> SQLite event record + optional server POST
-            -> GUI / health dashboard
+Microphone input
+  -> frame capture and channel split
+       -> XVF3800 raw microphone channels
+            -> filtering, frame features, energy-based speech segmentation
+            -> SRP-PHAT direction-of-arrival estimation
+            -> delay-and-sum beamforming
+            -> voice-feature extraction and optional accent classifier
+            -> optional faster-whisper transcription
+       -> configured XVF3800 ASR and sum channels (split out, not yet used downstream)
+  -> optional openWakeWord detection on a selected raw microphone channel
+  -> wake-word / transcript matching and attention tracking
+  -> SQLite event record, dashboard update, and robot-interface commands
 ```
 
-## 2. Requirements and installation
+The XVF3800 profile expects six synchronized input channels at 16 kHz: channel 0 is ASR, channel 1 is the array sum, and channels 2-5 are the four raw microphones. The current pipeline uses the raw microphones for detection, localization, and transcription (after beamforming); it splits out the ASR and sum channels but does not yet feed them into later processing. The DoA estimator uses the configured microphone geometry, not the XVF3800's on-device DoA.
+
+## Requirements and installation
 
 - Python 3.14 or later.
-- A **synchronised multichannel microphone array** (usually a USB array or a multichannel audio interface) for useful DoA estimates. Several unrelated USB microphones are not automatically synchronised; their independent clocks and latencies can make phase/time-difference methods unreliable.
-- Microphone positions measured in metres, expressed relative to the robot, in the same order as the input channels.
+- A synchronized multichannel microphone array for useful DoA estimates. Independent USB microphones may have unrelated clocks and latency.
+- Microphone positions measured in metres and ordered to match the raw microphone channels.
 
-Install the core dependencies:
+Create and activate a virtual environment, then install the core dependencies:
 
 ```bash
 python -m venv .venv
-# Windows PowerShell: .venv\\Scripts\\Activate.ps1
-# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# macOS/Linux:
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Install optional speech recognition, wake-word, model-training, USB-diagnostic,
-and test dependencies:
+Install the optional integrations and test dependencies for your platform:
 
 ```bash
 python -m pip install -r requirements-optional.txt
 ```
 
-The speech-to-text and wake-word dependencies are skipped on Python 3.15 because
-ONNX Runtime does not yet provide compatible Python 3.15 wheels. On Linux,
-openWakeWord is also omitted from the standard optional install because its
-published package requires TFLite Runtime, which has no Python 3.14 wheel.
-Linux users on Python 3.14 can use openWakeWord's ONNX backend with an ONNX
-model by installing the wrapper without dependencies after installing the
-requirements above:
+### Recommended speech and wake-word features
+
+`faster-whisper` provides local speech transcription. The default `base` model may be downloaded the first time the app starts, so internet access may be needed once. Use `--stt-model` to choose another supported model size or a local model path. Transcription can be disabled by omitting the optional package; the app then continues with empty transcripts.
+
+`openWakeWord` provides acoustic wake-word detection. The repository includes ONNX and TFLite model files under `data/`; the default ONNX path is configured in `robot_ssl/config.py`. The first run may download openWakeWord's auxiliary models if they are missing.
+
+On Linux, the optional requirements omit the openWakeWord package because its published dependency metadata requires TFLite Runtime, which has no Python 3.14 wheel. Install the wrapper without dependencies to use the ONNX backend instead:
 
 ```bash
 python -m pip install --no-deps "openwakeword>=0.6"
 ```
 
-The application selects ONNX inference for model paths ending in `.onnx`.
-TFLite models are not supported by this Linux workaround.
+The ONNX Runtime, `requests`, and `tqdm` dependencies are installed by the requirements files for this Linux workaround. Use an `.onnx` wake-word model; TFLite inference is not covered by this workaround. On Windows and macOS, the optional requirements install openWakeWord normally.
 
-`faster-whisper` loads the selected speech model when the application starts. The first run may need internet access to obtain the model if it is not already cached. For wake-word ML, obtain a compatible ONNX or TFLite model and pass its file path. For example, the openWakeWord project documents pre-trained models and its Python API at <https://github.com/tslapp/openwakeword> and <https://pypi.org/project/openwakeword/>. A model file is not bundled here.
+The speech-to-text and wake-word integrations are currently excluded by requirement markers on Python 3.15 because compatible ONNX Runtime wheels are not yet available there. Other core functionality may still be installable, but those features will be unavailable.
 
-## 3. Configure microphones
+## Configuration and running
 
-List devices and supported input channels:
+The default configuration selects the XVF3800 profile and six-channel input. Microphone geometry and processing settings are defined in `robot_ssl/config.py`; optional runtime overrides can be placed in the repository-root `config.json`. Check that the geometry matches the physical microphone positions and the order of the four raw microphone channels before interpreting azimuth results.
+
+List available audio devices:
 
 ```bash
 python main.py --list-devices
 ```
 
-The included `example_mic_geometry.json` is only an illustrative 10 cm square array. Replace the coordinates with measurements for your physical array. Its convention is **x = robot-forward, y = robot-left**, so 0° means in front of the robot and positive angles mean left.
-
-Run the synthetic DoA check without opening a microphone:
+Run the application, optionally specifying an input device by index or name:
 
 ```bash
+python main.py
+python main.py --device 2
+```
+
+The app attempts to find a reSpeaker XVF3800 device automatically when no device is specified. `--use-general-mic-model` selects the general microphone profile instead. Use `--help` to see all available options.
+
+Useful options include:
+
+```bash
+python main.py --wakeword-model data/hey_jarvis_v0.1.onnx --stt-model base
+python main.py --no-gui
+python main.py --keep-chat-logs
 python main.py --demo
 ```
 
-Run with a four-channel input device (replace `2` with the correct device index):
+The synthetic `--demo` checks DoA estimation without opening an audio stream. `--keep-chat-logs` preserves previously stored event records; by default the application clears stored events when it starts.
 
-```bash
-python main.py --device 2 --channels 4 --mic-geometry example_mic_geometry.json
-```
+If wake-word detection is disabled, transcript phrase matching can still recognize phrases such as “hey robot” when STT is available. If STT is disabled too, there are no transcript-based wake phrases.
 
-Enable an installed wake-word model and change STT model size, for example:
+## Robot interface
 
-```bash
-python main.py --device 2 --channels 4 \
-  --mic-geometry example_mic_geometry.json \
-  --wakeword-model models/hey_robot.onnx \
-  --stt-model base
-```
+Robot communication is experimental. `robot_ssl/interfaces/robot.py` opens a TCP socket using `robot_host` and `robot_port` from `AppConfig` and sends robot alertness and rotation commands. It is not a ROS interface and does not directly use a robot SDK. A compatible server must be listening at the configured address. Review and adapt the protocol, coordinate conventions, limits, and safety behavior for the target robot before connecting hardware.
 
-On Windows PowerShell, enter the command on one line or use PowerShell's backtick for line continuation instead of `\\`.
+The project also contains `robot_ssl/interfaces/xvf_usb.py` for XVF3800 control transfers over USB. It is not currently used by the main audio pipeline.
 
-For a console-only launch, add `--no-gui`. If the wake-word model is omitted, the app uses transcript matching for phrases such as “hey robot”, “hello robot”, or “robot”. Transcript matching needs a working STT backend. Without `faster-whisper`, the localisation loop can still run and a configured wake-word model can still trigger attention, but text transcripts and text-only wake-word fallback are unavailable.
+## Optional accent-model training
 
-## 4. Robot movement / camera integration
+The application reports an unknown accent unless a classifier is supplied with `--accent-model`. The classifier must be a `joblib`-serialized scikit-learn-compatible model trained on five features in this order:
 
-By default, `ConsoleRobotInterface` only logs simulated camera/head movements; it **does not actuate physical hardware**. To connect your robot, implement `RobotMovementInterface` in `robot_ssl/interfaces/robot.py` with the robot's SDK, ROS 2 action/topic, or motor controller. Alternatively, `--robot-endpoint URL` enables a generic JSON HTTP adapter. It POSTs a payload like:
-
-```json
-{
-  "command": "orient_camera",
-  "azimuth_degrees": 34.0,
-  "attention_score": 1.0,
-  "reason": "wakeword",
-  "timestamp_unix": 1780000000.0
-}
-```
-
-The exact endpoint schema must match your robot gateway. Test it in a simulated environment before enabling hardware movement. The adapter's alertness messages use `{"command":"set_alertness", "state":"attending", ...}`.
-
-An optional `--server-endpoint URL` receives JSON perception events. Keep such endpoints authenticated and on a trusted network; the example intentionally leaves authentication and transport-security policy to the deployment.
-
-## 5. Speech characteristics and accent model
-
-The included feature extractor estimates median pitch (where voiced periodicity is detectable), RMS level, spectral centroid, spectral roll-off, and zero-crossing rate. These are basic acoustic descriptors, **not a reliable voice identity or accent determination**. The application reports an unknown accent unless a trained classifier is supplied with `--accent-model PATH`.
-
-That file must be a `joblib`-serialized scikit-learn-compatible classifier trained to accept a feature vector in this exact order:
-
-1. median pitch in Hz (0 when unavailable)
+1. Median pitch in Hz (0 when unavailable)
 2. RMS in dBFS
-3. spectral centroid in Hz
+3. Spectral centroid in Hz
 4. 85% spectral roll-off in Hz
-5. zero-crossing rate
+5. Zero-crossing rate
 
-A production accent classifier should be trained and evaluated with consented, appropriately representative speech data. A starter train/test script is provided in `tools/train_accent_model.py`. It expects a CSV with the five feature columns above plus an `accent` label; run `python tools/train_accent_model.py data/accent_features.csv --model-out models/accent_classifier.joblib`, then pass `--accent-model models/accent_classifier.joblib` when launching the app. Its random holdout report is illustrative only: for serious evaluation, split by speaker so the same speaker does not appear in both train and test. The small baseline speaker-continuity score uses angular consistency and acoustic-feature similarity; it is not a biometric speaker-verification ML model. For crowded or safety-critical environments, replace it with a validated speaker embedding / diarisation model and stronger VAD.
+The optional trainer expects a CSV containing those features and an `accent` label:
 
-## 6. Data storage, privacy, and logging
+```bash
+python tools/train_accent_model.py data/accent_features.csv --model-out models/accent_classifier.joblib
+python main.py --accent-model models/accent_classifier.joblib
+```
 
-- SQLite records the transcript, estimated direction, confidence score, wake-word/addressing decisions, speech-feature summary, language, and timing. The storage service supports both saving events and loading recent history.
-- Raw audio is kept in memory for segment processing and is **not written to disk by default**.
-- Transcripts and acoustic features can still be sensitive. Set database access controls, retention and deletion rules, and consent notices appropriate to your use case.
-- Runtime performance counters include frames/second, input overflows, processing errors, dropped segments, and uptime.
+The included acoustic features and baseline speaker-continuity score are not reliable voice identity or accent verification. Use consented, representative data and speaker-separated evaluation; do not treat these heuristics as proof of identity.
 
-## 7. Project layout
+## Data, privacy, and limitations
+
+- SQLite stores transcripts and event metadata (direction, confidence, wake-word/addressing decisions, language, timing, and voice-feature summaries). Raw microphone audio is processed in memory and is not stored by default.
+- Stored events are cleared at startup unless `--keep-chat-logs` is provided. Protect the database and establish appropriate consent, retention, and deletion policies.
+- The VAD and delay-and-sum beamformer are baselines. Room reverberation, wind, clipping, poor calibration, array geometry, and robot noise can reduce accuracy.
+- DoA assumes synchronized microphones and far-field speech. A linear two-microphone array can have front/back ambiguity.
+- Robot angle conventions, movement limits, emergency stops, and hardware safety interlocks must be implemented and validated for the target platform.
+- Accent and speaker-continuity heuristics are not biometric speaker verification.
+
+## Project layout
 
 ```text
 main.py
 robot_ssl/
-  app.py                         # Integration and worker pipelines
-  config.py                      # Audio/DoA/VAD settings and array geometry
-  models.py                      # Shared event/feature records
-  attention.py                   # Addressing + continued-speaker tracking baseline
+  app.py                         # Audio pipeline and application orchestration
+  config.py                      # Runtime settings and XVF3800 channel mapping
+  config_ext/extMicIndices.py    # Named input-channel indices
   audio/
-    processing.py                # Cleaning, frame features, energy VAD
+    processing.py                # Filtering, features, energy VAD and segmentation
     localization.py              # SRP-PHAT-style azimuth estimator
-    beamformer.py                # Direction-steered delay-and-sum
+    beamformer.py                # Direction-steered delay-and-sum beamforming
     wakeword.py                  # Optional openWakeWord adapter
     stt.py                       # Optional faster-whisper adapter
-    characteristics.py           # Speech features + accent-model adapter
+    characteristics.py           # Voice features and optional accent classifier
   interfaces/
-    robot.py                     # Console and HTTP robot adapters
-    server.py                    # Optional event POST interface
+    robot.py                     # Experimental TCP robot interface
+    xvf_usb.py                   # XVF3800 USB controls (not used by main pipeline)
   services/
-    storage.py                   # SQLite event records
-    health.py                    # Runtime monitoring counters
-  gui/dashboard.py               # Tkinter dashboard
+    storage.py                   # SQLite event storage
+    health.py                    # Runtime counters
+  gui/dashboard.py               # Tkinter live dashboard
+tools/train_accent_model.py      # Optional accent-model training utility
+tests/                           # Offline unit tests
 ```
 
-## 8. Limitations to address before production
+## Tests
 
-1. **Array calibration:** this demo assumes far-field speech and a known planar 2-D microphone layout. A linear two-mic array can have front/back ambiguity. Poor geometry, reverberation, wind, clipping, or robot self-noise will reduce accuracy.
-2. **Independent microphones:** use a shared audio clock or calibrate and continually compensate for inter-device sample-rate/latency drift.
-3. **VAD and beamforming:** the included energy VAD and simple frequency-domain delay-and-sum beamformer are baselines. Test on your robot's own noise and room acoustics; consider stronger VAD and adaptive beamforming.
-4. **Addressing decision:** only a confirmed wake word or transcript wake phrase starts attention. Afterwards, the baseline uses direction and acoustic-feature consistency for an 8-second session. Do not use this heuristic as proof of speaker identity.
-5. **Robot control:** camera angles, coordinate signs, limits, velocity profiles, safety interlocks, and emergency stops are robot-specific and must be added in the hardware adapter.
-6. **Latency:** speech-to-text is performed in a separate worker thread so the real-time capture loop can continue. If utterances arrive faster than inference, the bounded queue drops excess segments and increments a health counter.
-
-## 9. Tests
-
-Install core requirements, then run:
+Install `requirements-optional.txt`, then run:
 
 ```bash
 python -m pytest -q
 ```
 
-The synthetic DoA demo can also be run directly with `python main.py --demo`.
+The tests use synthetic signals and temporary databases; they do not require a microphone or a connected robot. The DoA demo is also available with `python main.py --demo`.

@@ -6,7 +6,6 @@ import re
 import threading
 import time
 from typing import Any, Tuple
-from narwhals import Float32
 import numpy as np
 from numpy.typing import NDArray
 
