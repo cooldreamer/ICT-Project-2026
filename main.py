@@ -120,7 +120,7 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
     for position in np.asarray(positions, dtype=np.float64):
         arrival_delay = -float(np.dot(position, direction)) / 343.0
         shifted_spectrum = source_spectrum * np.exp(-1j * 2.0 * np.pi * frequencies * arrival_delay)
-        audio.append(np.fft.irfft(shifted_spectrum, n=n_samples))
+        audio.append(np.fft.irfft(shifted_spectrum, n=n_samples, out=np.empty(n_samples, dtype=np.float32)))
     multichannel = np.column_stack(audio).astype(np.float32)
     localizer = SRPPHATLocalizer(positions, sample_rate=sample_rate, angle_step_degrees=1.0)
     

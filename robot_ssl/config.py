@@ -35,6 +35,7 @@ XVF3800_INPUT_CHANNELS = 6
 XVF3800_SAMPLE_RATE = 16_000
 XVF3800_MIC_CHANNEL_INDICES: MicIndices = MicIndices(asr=0, sum=1, raw=(2, 3, 4, 5)) # indexed from 0
 
+
 @dataclass
 class AppConfig:
     """Class managing the configuration settings for the whole project.
