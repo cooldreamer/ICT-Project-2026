@@ -1,4 +1,6 @@
-"""Test file for communication with the reSpeaker XVF3800 microphone array using libusb/pyusb."""
+"""Communication interface with non-audio aspects of the reSpeaker XVF3800 microphone array using libusb/pyusb.
+
+Note: Currently unused - to use, the DoA algorithms would have to be replaced."""
 
 import struct # for neat structuring of binary data
 import time # for delaying the main loop (just time.sleep())
@@ -11,7 +13,6 @@ import usb # Mac/Linux (pyusb, a Python library that provides easy access to USB
 
 # Project config settings (for microphone array, etc.)
 # If the script is run directly, it cannot natively access the config module; adjustment to the import path is needed to include the parent directory
-# (Note: Since this is a test script using an alternative method for reading the microphone array, we do not want to import the full robot app module)
 if not __name__.startswith("robotssl"):
     if __name__ == "__main__":
         import sys

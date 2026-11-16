@@ -1,5 +1,5 @@
 """SQLite storage for metadata/transcripts; raw microphone audio is not persisted."""
-from __future__ import annotations
+
 import json
 import sqlite3
 import threading
@@ -41,7 +41,7 @@ class DatabaseStore:
         """)
         self.connection.commit()
 
-    def save_event(self, event: dict[str, Any]) -> None:
+    def saveEvent(self, event: dict[str, Any]) -> None:
         """Store an event's transcript, direction, decisions, and voice traits.
 
         Parameters:
@@ -70,7 +70,7 @@ class DatabaseStore:
             self.connection.commit()
 
 
-    def load_recent_events(self, limit: int = 20) -> list[dict[str, Any]]:
+    def loadRecentEvents(self, limit: int = 20) -> list[dict[str, Any]]:
         """Load recent event metadata from storage, newest first.
 
         Parameters:

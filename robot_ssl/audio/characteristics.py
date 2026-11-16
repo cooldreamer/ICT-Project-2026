@@ -1,5 +1,4 @@
 """Speech acoustic-feature extraction and an optional trained accent classifier."""
-from __future__ import annotations
 
 from pathlib import Path
 import numpy as np

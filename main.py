@@ -38,6 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--robot-endpoint", help="Optional HTTP endpoint that accepts generic JSON robot commands")
     parser.add_argument("--server-endpoint", help="Optional HTTP endpoint to receive perception events")
     parser.add_argument("--database", default="data/robot_audio.sqlite3", help="SQLite database path")
+    parser.add_argument("--keep-chat-logs", action="store_true", help="Preserves the chat log stored in the database; WILL CLEAR DATABASE ON STARTUP IF NOT SET")
     parser.add_argument("--log-level", default="INFO", choices=("DEBUG", "INFO", "WARNING", "ERROR"))
     parser.add_argument("--no-gui", action="store_true", help="Run without Tkinter dashboard")
     parser.add_argument("--list-devices", action="store_true", help="List audio devices and exit")

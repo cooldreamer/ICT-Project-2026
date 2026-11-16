@@ -1,5 +1,4 @@
 """SRP-PHAT-style far-field azimuth estimation for synchronised microphone arrays."""
-from __future__ import annotations
 
 from dataclasses import dataclass
 import numpy as np

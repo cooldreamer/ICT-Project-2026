@@ -1,5 +1,5 @@
 """Minimal Tkinter live dashboard for the robot audio-perception pipeline."""
-from __future__ import annotations
+
 import queue
 import tkinter as tk
 from tkinter import ttk

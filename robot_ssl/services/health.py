@@ -1,5 +1,5 @@
 """Small runtime health/performance counter service."""
-from __future__ import annotations
+
 import time
 from collections import deque
 

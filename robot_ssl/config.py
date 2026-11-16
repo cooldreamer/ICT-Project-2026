@@ -83,17 +83,13 @@ class AppConfig:
     wakeword_model_path: Path | None = Path("data/hey_jarvis_v0.1.onnx")
     accent_model_path: str | None = None
     
-    robot_endpoint: str | None = None
-    server_endpoint: str | None = None
+    robot_host: str = "127.0.0.1"
+    robot_port: int = 5000
+    
     database_path: Path = Path("data/robot_audio.sqlite3")
+    preserve_chat_log_on_start: bool = False
     
     log_level: str = "INFO"
-    
-    robot_hostname = "192.168.1.8"
-    console_hostname = "192.168.1.210"
-    discovery_server_port = 11811
-    discovery_server_host = robot_hostname
-    ros_domain_id = "9"
     
     
     # XVF3800 usage-dependent properties
@@ -163,14 +159,14 @@ class AppConfig:
     
     
     def load_json(self):
-        """Load settings from ``robot_ssl/config.json`` if it exists.
+        """Load settings from ``config.json`` if it exists.
 
         Returns:
             The settings dictionary, or an empty dictionary if the file is missing.
         """
         json_settings = {}
         try:
-            with open("robot_ssl/config.json") as json_file:
+            with open("config.json") as json_file:
                 json_settings = json.load(json_file)
         except FileNotFoundError:
             print("JSON config file not found.  Using command args or default settings.")

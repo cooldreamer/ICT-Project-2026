@@ -1,4 +1,5 @@
 """Replaceable robot head/camera control interface (console and HTTP adapters)."""
+
 import json
 import logging
 import math

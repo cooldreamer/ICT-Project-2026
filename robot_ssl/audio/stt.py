@@ -1,5 +1,5 @@
 """Lazy wrapper around faster-whisper; no network/server is needed during inference after model setup."""
-from __future__ import annotations
+
 import logging
 import numpy as np
 

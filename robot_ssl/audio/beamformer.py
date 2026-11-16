@@ -1,5 +1,4 @@
 """Frequency-domain delay-and-sum beamformer steered by the estimated azimuth."""
-from __future__ import annotations
 
 import numpy as np
 

@@ -10,5 +10,10 @@
     "vad_end_silence_seconds": 0.55,
     "vad_pre_roll_seconds": 0.24,
     "vad_min_speech_seconds": 0.24,
-    "vad_max_segment_seconds": 12.0
+    "vad_max_segment_seconds": 12.0,
+
+    "robot_host": "127.0.0.1",
+    "robot_port": 5000,
+
+    "preserve_chat_log_on_start": false
 }

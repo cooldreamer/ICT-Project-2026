@@ -19,7 +19,6 @@ from robot_ssl.audio.stt import SpeechToText
 from robot_ssl.audio.wakeword import WakeWordDetector
 from robot_ssl.config import AppConfig
 from robot_ssl.interfaces.robot import RobotMovementInterface
-from robot_ssl.interfaces.server import ServerInterface
 from robot_ssl.models import AudioSegment, VoiceTraits # VoiceTraits is a settings class which does not seem to be being used, hmm...
 from robot_ssl.services.health import HealthMonitor
 from robot_ssl.services.storage import DatabaseStore
@@ -115,8 +114,7 @@ class RobotAudioApp:
             angle_tolerance_degrees=config.subject_angle_tolerance_degrees,
         )
         
-        self.robot: RobotMovementInterface = RobotMovementInterface(config.robot_endpoint if config.robot_endpoint else "")
-        self.server = ServerInterface(config.server_endpoint)
+        self.robot: RobotMovementInterface = RobotMovementInterface(config.robot_host, config.robot_port)
         self.store = DatabaseStore(config.database_path)
         self.health = HealthMonitor()
         
@@ -213,7 +211,7 @@ class RobotAudioApp:
 
         worker = threading.Thread(target=self._segmentWorker, name="speech-segment-worker", daemon=True)
         worker.start()
-        self.robot.setAlertness(True, "Audio perception starting")
+        self.robot.setAlertness(True, "audio perception starting")
         self._publish({
             "type": "status",
             "message": "Listening for speech. Wake-word model: " + ("enabled" if self.wakeword.enabled else "disabled; transcript fallback active"),
@@ -299,7 +297,7 @@ class RobotAudioApp:
             self.stop_event.set()
             worker.join()
             self.store.close()
-            self.robot.setAlertness(False, "Audio perception stopped")
+            self.robot.setAlertness(False, "audio perception stopped")
         
         return
 
@@ -367,12 +365,12 @@ class RobotAudioApp:
             score = 1.0
             addressed = True
             self.attention.engage(angle, traits)
-            self.robot.setAlertness(True, "Wake word detected")
+            self.robot.setAlertness(True, "wake word detected")
         elif self.attention.active:
             score = self.attention.assess_continuation(angle, traits, speech_detected=True)
             addressed = score >= 0.55
             if addressed:
-                self.robot.setAlertness(True, "Subject appears to be continuing")
+                self.robot.setAlertness(True, "subject appears to be continuing")
         else:
             score = 0.0
             addressed = False
@@ -380,7 +378,7 @@ class RobotAudioApp:
         if addressed and angle is not None:
             self.robot.turnBy(angle, "wakeword" if wakeword_confirmed else "continued_subject_speech")
         elif text:
-            self.robot.setAlertness(False, "Speech heard but not identified as addressing the robot")
+            self.robot.setAlertness(False, "speech heard but not identified as addressing the robot")
 
         event = {
             "type": "segment",
@@ -397,8 +395,7 @@ class RobotAudioApp:
             "stt_available": stt.available,
             "attention_active": self.attention.active,
         }
-        self.store.save_event(event)
-        self.server.send_event(event)
+        self.store.saveEvent(event)
         self._publish(event)
         logging.info(
             "speech=%r | azimuth=%s | wakeword=%s | addressing_robot=%s | attention=%.2f",
