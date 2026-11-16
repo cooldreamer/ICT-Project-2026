@@ -1,5 +1,5 @@
 """Wakeword session and continued-subject speech tracking."""
-from __future__ import annotations
+
 import math
 import time
 from robot_ssl.models import VoiceTraits

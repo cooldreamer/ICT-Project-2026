@@ -208,6 +208,7 @@ def main() -> int:
                 "robot_endpoint": args.robot_endpoint,
                 "server_endpoint": args.server_endpoint,
                 "database_path": args.database,
+                "preserve_chat_log_on_start": args.keep_chat_logs,
                 "log_level": args.log_level
             }.items() if value is not None}
         )

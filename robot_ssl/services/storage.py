@@ -40,13 +40,15 @@ class DatabaseStore:
             )
         """)
         self.connection.commit()
+        
+        return
 
     def saveEvent(self, event: dict[str, Any]) -> None:
         """Store an event's transcript, direction, decisions, and voice traits.
-
+        
         Parameters:
             * event : Perception event and associated metadata to persist.
-
+        
         Returns:
             None.
         """
@@ -68,6 +70,8 @@ class DatabaseStore:
                 event.get("doa_confidence"),
             ))
             self.connection.commit()
+        
+        return
 
 
     def loadRecentEvents(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -107,7 +111,20 @@ class DatabaseStore:
             except (TypeError, json.JSONDecodeError):
                 event["voice_traits"] = {}
             events.append(event)
+        
         return events
+    
+    def clearEvents(self) -> None:
+        """Delete all stored events while preserving the database schema.
+
+        Returns:
+            None.
+        """
+        with self.lock:
+            self.connection.execute("DELETE FROM perception_events")
+            self.connection.commit()
+
+        return
 
     def close(self) -> None:
         """Close the SQLite connection.
@@ -117,3 +134,5 @@ class DatabaseStore:
         """
         with self.lock:
             self.connection.close()
+        
+        return

@@ -115,7 +115,11 @@ class RobotAudioApp:
         )
         
         self.robot: RobotMovementInterface = RobotMovementInterface(config.robot_host, config.robot_port)
+        
+        
         self.store = DatabaseStore(config.database_path)
+        if not config.preserve_chat_log_on_start:
+            self.store.clearEvents()
         self.health = HealthMonitor()
         
         self.segment_queue: queue.Queue[AudioSegment] = queue.Queue(maxsize=6)
@@ -199,7 +203,7 @@ class RobotAudioApp:
             None.
 
         Raises:
-            RuntimeError: If the ``sounddevice`` dependency is unavailable.
+            RuntimeError: If the `sounddevice` dependency is unavailable.
             Exception: If audio capture or processing fails; the original error
                 is logged, published, and re-raised.
         """
@@ -208,96 +212,119 @@ class RobotAudioApp:
         except ImportError as exc:
             self._publish({"type": "error", "message": "Missing sounddevice. Install requirements.txt first."})
             raise RuntimeError("Missing dependency: sounddevice; run `pip install -r requirements.txt`") from exc
-
-        worker = threading.Thread(target=self._segmentWorker, name="speech-segment-worker", daemon=True)
-        worker.start()
-        self.robot.setAlertness(True, "audio perception starting")
-        self._publish({
-            "type": "status",
-            "message": "Listening for speech. Wake-word model: " + ("enabled" if self.wakeword.enabled else "disabled; transcript fallback active"),
-        })
-
-        try:
-            print("# channels:", self.config.input_channels)
-            with sd.InputStream(
-                samplerate=self.config.sample_rate,
-                channels=self.config.input_channels,
-                blocksize=self.config.frame_samples,
-                dtype="float32",
-                device=self.device,
-            ) as stream:
-                
-                logging.info("Audio stream started: %s Hz, %s channels", self.config.sample_rate, self.config.input_channels)
-                while not self.stop_event.is_set():
-                    raw_frame, overflowed = stream.read(self.config.frame_samples)
-                    if overflowed:
-                        self.health.audio_overflows += 1
-                    
-                    asr_frame, sum_frame, mics_frame = self._splitAudioData(raw_frame)
-                    
-                    cleaned = self.cleaner.clean(mics_frame)
-                    features = extract_frame_features(cleaned, self.config.sample_rate)
-                    per_channel_rms = np.sqrt(np.mean(cleaned.astype(np.float64) ** 2, axis=0))
-                    wake_mono = cleaned[:, int(np.argmax(per_channel_rms))]
-                    wakeword_detected, wake_score = self.wakeword.detect(wake_mono)
-                    self.last_wakeword_score = wake_score
-                    
-                    doa_angle: float | None = None
-                    doa_confidence: float | None = None
-                    # Avoid spending CPU localising very quiet frames.
-                    # print(self.config.raw_channels)
-                    # print(f"{features.rms:.8f}")
-                    # print(f"{self.config.vad_min_rms:.8f}")
-                    # print()
-                    
-                    if self.config.raw_channels >= 2 and features.rms >= self.config.vad_min_rms * 0.5:
-                        result = self.localizer.localize(cleaned)
-                        if result is not None:
-                            doa_angle = result.azimuth_degrees
-                            doa_confidence = result.confidence
-                            self.last_azimuth = doa_angle
-                            self.last_doa_confidence = doa_confidence
-
-                    segment = self.segmenter.process(
-                        cleaned,
-                        rms=features.rms,
-                        doa_angle=doa_angle,
-                        wakeword_detected=wakeword_detected,
-                        doa_confidence=doa_confidence,
-                    )
-                    if segment is not None:
-                        try:
-                            self.segment_queue.put_nowait(segment)
-                        except queue.Full:
-                            self.health.dropped_segments += 1
-                            logging.warning("Speech segment queue full; dropped an utterance")
-
-                    self.health.record_frame()
-                    now = time.monotonic()
-                    if now - self.last_ui_publish >= 0.20:
-                        self._publish({
-                            "type": "telemetry",
-                            "azimuth_degrees": self.last_azimuth,
-                            "doa_confidence": self.last_doa_confidence,
-                            "rms_dbfs": features.rms_dbfs,
-                            "wakeword_score": self.last_wakeword_score,
-                            "wakeword_enabled": self.wakeword.enabled,
-                            "attention_active": self.attention.active,
-                            "health": self.health.snapshot(),
-                        })
-                        self.last_ui_publish = now
         
-        except KeyboardInterrupt:
-            logging.info("Keyboard interrupt received")
-        except Exception as exc:
-            logging.exception("Audio capture or processing failed: %s", exc)
-            self._publish({"type": "error", "message": f"Audio capture failed: {exc}"})
-            raise
-        finally:
+        setup_state = "worker"
+        try:
+            worker = threading.Thread(target=self._segmentWorker, name="speech-segment-worker", daemon=True)
+            worker.start()
+            
+            setup_state = "robot"
+            # self.robot.setAlertness(True, "audio perception starting")
+            self._publish({
+                "type": "status",
+                "message": "Listening for speech. Wake-word model: " + ("enabled" if self.wakeword.enabled else "disabled; transcript fallback active"),
+            })
+            
+            setup_state = "completed"
+        except:
+            print(f"!!Error occurred on {setup_state} setup.")
+            
             self.stop_event.set()
-            worker.join()
+            
+            if setup_state != "worker":
+                worker.join()
+            
             self.store.close()
+            
             self.robot.setAlertness(False, "audio perception stopped")
+            self.robot.close()
+        else:
+
+            try:
+                print("# channels:", self.config.input_channels)
+                with sd.InputStream(
+                    samplerate=self.config.sample_rate,
+                    channels=self.config.input_channels,
+                    blocksize=self.config.frame_samples,
+                    dtype="float32",
+                    device=self.device,
+                ) as stream:
+                    
+                    logging.info("Audio stream started: %s Hz, %s channels", self.config.sample_rate, self.config.input_channels)
+                    while not self.stop_event.is_set():
+                        raw_frame, overflowed = stream.read(self.config.frame_samples)
+                        if overflowed:
+                            self.health.audio_overflows += 1
+                        
+                        asr_frame, sum_frame, mics_frame = self._splitAudioData(raw_frame)
+                        
+                        cleaned = self.cleaner.clean(mics_frame)
+                        features = extract_frame_features(cleaned, self.config.sample_rate)
+                        per_channel_rms = np.sqrt(np.mean(cleaned.astype(np.float64) ** 2, axis=0))
+                        wake_mono = cleaned[:, int(np.argmax(per_channel_rms))]
+                        wakeword_detected, wake_score = self.wakeword.detect(wake_mono)
+                        self.last_wakeword_score = wake_score
+                        
+                        doa_angle: float | None = None
+                        doa_confidence: float | None = None
+                        # Avoid spending CPU localising very quiet frames.
+                        # print(self.config.raw_channels)
+                        # print(f"{features.rms:.8f}")
+                        # print(f"{self.config.vad_min_rms:.8f}")
+                        # print()
+                        
+                        if self.config.raw_channels >= 2 and features.rms >= self.config.vad_min_rms * 0.5:
+                            result = self.localizer.localize(cleaned)
+                            if result is not None:
+                                doa_angle = result.azimuth_degrees
+                                doa_confidence = result.confidence
+                                self.last_azimuth = doa_angle
+                                self.last_doa_confidence = doa_confidence
+
+                        segment = self.segmenter.process(
+                            cleaned,
+                            rms=features.rms,
+                            doa_angle=doa_angle,
+                            wakeword_detected=wakeword_detected,
+                            doa_confidence=doa_confidence,
+                        )
+                        if segment is not None:
+                            try:
+                                self.segment_queue.put_nowait(segment)
+                            except queue.Full:
+                                self.health.dropped_segments += 1
+                                logging.warning("Speech segment queue full; dropped an utterance")
+
+                        self.health.record_frame()
+                        now = time.monotonic()
+                        if now - self.last_ui_publish >= 0.20:
+                            self._publish({
+                                "type": "telemetry",
+                                "azimuth_degrees": self.last_azimuth,
+                                "doa_confidence": self.last_doa_confidence,
+                                "rms_dbfs": features.rms_dbfs,
+                                "wakeword_score": self.last_wakeword_score,
+                                "wakeword_enabled": self.wakeword.enabled,
+                                "attention_active": self.attention.active,
+                                "health": self.health.snapshot(),
+                            })
+                            self.last_ui_publish = now
+            
+            except KeyboardInterrupt:
+                logging.info("Keyboard interrupt received")
+            except Exception as exc:
+                logging.exception("Audio capture or processing failed: %s", exc)
+                self._publish({"type": "error", "message": f"Audio capture failed: {exc}"})
+                raise
+            finally:
+                self.stop_event.set()
+                
+                worker.join()
+                
+                self.store.close()
+                
+                self.robot.setAlertness(False, "audio perception stopped")
+                self.robot.close()
         
         return
 

@@ -4,4 +4,3 @@
 * Complete adding comments to extMicIndices.py
 * Complete adding comments to main.py
 * Add json processing for mic positions in config file
-* Implement thing to clear chat logs at start if setting is set to do so
