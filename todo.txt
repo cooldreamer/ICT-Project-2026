@@ -1,0 +1,6 @@
+* Tidy up modules
+ ** Move try-excepts for imports to top and readjust program accordingly
+* Fix STT transcribing wake word instances incorrectly, even when the wake word LLM picks it up (usually correctly)
+* Complete adding comments to extMicIndices.py
+* Complete adding comments to main.py
+* Add json processing for mic positions in config file
