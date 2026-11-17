@@ -20,7 +20,15 @@ SERIAL_PORT = "COM3"  # Windows -- check devices to determine the port id
 
 # For Docker or mutlpi proc use TCP
 CONAS = "TCP"  #USB, #TEST
-TCP_PORT = 5001
+HOST_NAME = "127.0.0.1"
+TCP_PORT = 5004
+
+#from robot_ssl.config import AppConfig
+#config = AppConfig()
+#config.validate()
+
+#HOST_NAME = config.robot_host
+#TCP_PORT = config.robot_port
 
 # TEST
 #CONAS = "TEST"  #TCP, #USB
@@ -28,12 +36,8 @@ TCP_PORT = 5001
 heading = 0.0
 
 
-# --------------------------------------------------
 # Serial Monitor
-# --------------------------------------------------
-
 def serial_thread():
-
     global heading
 
     ser = serial.Serial(
@@ -55,9 +59,7 @@ def serial_thread():
             if "turnby" in data:
 
                 heading += float(data["turnby"])
-
                 heading %= 360
-
                 print("Heading =", heading)
 
                 root.after(0, draw_gauge)
@@ -65,25 +67,18 @@ def serial_thread():
         except Exception as e:
             print(e)
 
-# --------------------------------------------------
-# Serial Monitor
-# --------------------------------------------------
 
 def socket_thread():
-
     global heading
 
     ser = socket.socket()
-    ser.bind(("127.0.0.1", TCP_PORT))
+    ser.bind((HOST_NAME, TCP_PORT))
     ser.listen(1)
 
-    print("Connecting...")
     conn, addr = ser.accept()
-    print("...Connected.")
     
     try:
         while True:
-
             try:
                 line = conn.recv(1024)
 
@@ -95,9 +90,7 @@ def socket_thread():
                 if "turnby" in data:
 
                     heading += float(data["turnby"])
-
                     heading %= 360
-
                     print("Heading =", heading)
 
                     root.after(0, draw_gauge)
@@ -117,14 +110,11 @@ def socket_thread():
 # --------------------------------------------------
 
 def draw_gauge():
-
     canvas.delete("all")
 
     cx = 200
     cy = 200
     r = 150
-    
-    print("Part 1")
 
     # compass circle
     canvas.create_oval(
@@ -132,24 +122,16 @@ def draw_gauge():
         cx+r, cy+r,
         width=2
     )
-    
-    print("Part 2")
 
     canvas.create_text(cx, cy-r-15, text="N")
     canvas.create_text(cx+r+15, cy, text="E")
     canvas.create_text(cx, cy+r+15, text="S")
     canvas.create_text(cx-r-15, cy, text="W")
-    
-    print("Part 3")
 
     angle = math.radians(heading - 90)
-    
-    print("Part 4")
 
-    x = cx + r * 0.8 * math.cos(angle)
+    x = cx - r * 0.8 * math.cos(angle)
     y = cy + r * 0.8 * math.sin(angle)
-    
-    print("Part 5")
 
     canvas.create_line(
         cx, cy,
@@ -157,20 +139,15 @@ def draw_gauge():
         width=4,
         fill="red"
     )
-    
-    print("Part 6")
 
     canvas.create_text(
         cx,
         cy+178,
         text=f"{heading:.1f}°"
     )
-    
-    print("Part 7")
 
 # Internal Gauge draw test
 def test():
-
     global heading
 
     heading += 30
@@ -181,11 +158,7 @@ def test():
     root.after(1000, test)
 
 
-
-# --------------------------------------------------
 # Tkinter UI
-# --------------------------------------------------
-
 root = tk.Tk()
 
 root.title("Robot Direction Gauge")
@@ -199,6 +172,8 @@ canvas = tk.Canvas(
 canvas.pack()
 
 draw_gauge()
+
+root.update_idletasks()
 
 if CONAS == "USB":
     threading.Thread(
@@ -214,8 +189,4 @@ else:
     # TEST
     root.after(1000, test)
 
-print("still passing by")
-
-
 root.mainloop()
-
