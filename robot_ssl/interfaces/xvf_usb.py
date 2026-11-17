@@ -1,6 +1,6 @@
 """Communication interface with non-audio aspects of the reSpeaker XVF3800 microphone array using libusb/pyusb.
 
-Note: Currently unused - to use, the DoA algorithms would have to be replaced."""
+NOTE: Currently unused - to use, the DoA algorithms would have to be replaced."""
 
 import struct # for neat structuring of binary data
 import time # for delaying the main loop (just time.sleep())

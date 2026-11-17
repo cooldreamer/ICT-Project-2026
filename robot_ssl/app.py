@@ -346,7 +346,7 @@ class RobotAudioApp:
         
         while not self.stop_event.is_set() or not self.segment_queue.empty():
             try:
-                #print(self.segment_queue.qsize())
+                # print(self.segment_queue.qsize())
                 segment = self.segment_queue.get(timeout=0.2)
             except queue.Empty:
                 continue

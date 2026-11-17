@@ -84,7 +84,7 @@ class AppConfig:
     accent_model_path: str | None = None
     
     robot_host: str = "127.0.0.1"
-    robot_port: int = 5000
+    robot_port: int = 5004
     
     database_path: Path = Path("data/robot_audio.sqlite3")
     preserve_chat_log_on_start: bool = False

@@ -29,7 +29,7 @@ class SpeechToText:
             None.
         """
         
-        print("THIS IS A TEST - STT HAS RUN")
+        # print("THIS IS A TEST - STT HAS RUN")
         
         self.model = None
         self.error: str | None = None
