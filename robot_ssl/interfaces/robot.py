@@ -13,6 +13,8 @@ class RobotMovementInterface:
     
     Currently controls robot rotation and alertness.  Note that socket must be closed after completion of use."""
     
+    delay = 0.1 #seconds
+    
     _alertState = False
     
     # Alertness state property - controls sending of alertness data while flag is set.
@@ -29,6 +31,8 @@ class RobotMovementInterface:
             self._tryToSendData({"alertness": value})
         else:
             raise TypeError("Alertness state must be a boolean")
+        
+        time.sleep(self.delay) # should use a general scheduling function instead...
         return
     
     def __init__(self, host: str="127.0.0.1", port: int=5000) -> None:
@@ -64,7 +68,7 @@ class RobotMovementInterface:
         
         return socket_data
 
-    def turnBy(self, degrees: float, details: str) -> bool:
+    def turnBy(self, degrees: float, details: str = "") -> bool:
         """Turn the robot's head by a specific rotation.
         
         Parameters:
@@ -91,7 +95,7 @@ class RobotMovementInterface:
                 "[ROBOT] Would-be turn factor: %+.1f° %s%s", abs(degrees), ("left" if math.copysign(1, degrees) > 0 else "right"), (f" ({details})" if details else "")
             )
         
-        time.sleep(0.1)
+        time.sleep(self.delay) # should use a general scheduling function instead...
         
         return True
     
@@ -128,6 +132,12 @@ class RobotMovementInterface:
                 data_sent = True
         return data_sent
     
+    def angleTest(self):
+        for i in range(-180, 180, 36):
+            self.turnBy(i)
+        
+        return
+    
     def close(self) -> bool:
         """Close the socket connecting to the robot.
         
@@ -138,3 +148,25 @@ class RobotMovementInterface:
         """
         # self.socket.close()
         return True
+
+if not __name__.startswith("robot_ssl"):
+    if __name__ == "__main__":
+        import sys
+        from pathlib import Path
+
+        # Get the absolute path of the directory two levels up
+        parent_dir = Path(__file__).resolve().parent.parent
+        
+        # Add it to the path
+        sys.path.insert(0, str(parent_dir))
+
+    # Now import normally
+    from config import AppConfig 
+else:
+    from robot_ssl.config import AppConfig
+
+if __name__ == "__main__":
+    
+    myConfig = AppConfig()
+    robotthing = RobotMovementInterface(myConfig.robot_host, myConfig.robot_port)
+    robotthing.angleTest() # crashes robot for some reason, hm

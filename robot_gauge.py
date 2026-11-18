@@ -58,7 +58,7 @@ def serial_thread():
 
             if "turnby" in data:
 
-                heading += float(data["turnby"])
+                heading = float(data["turnby"]) # temporary set to relative direction instead of absolute
                 heading %= 360
                 print("Heading =", heading)
 
@@ -89,7 +89,7 @@ def socket_thread():
 
                 if "turnby" in data:
 
-                    heading += float(data["turnby"])
+                    heading = float(data["turnby"]) # temporary set to relative direction instead of absolute
                     heading %= 360
                     print("Heading =", heading)
 

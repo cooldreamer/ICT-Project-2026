@@ -1,19 +1,18 @@
 """Communication interface with non-audio aspects of the reSpeaker XVF3800 microphone array using libusb/pyusb.
-
-NOTE: Currently unused - to use, the DoA algorithms would have to be replaced."""
+"""
 
 import struct # for neat structuring of binary data
 import time # for delaying the main loop (just time.sleep())
 import traceback # for printing the full traceback of exceptions
 import sys # for tracking the operating system used so that the correct USB library can be selected
 
- # for the efficient and safe handling of USB device connections
+# for the efficient and safe handling of USB device connections
 import libusb_package # Windows (a wrapper for libusb, a C library that provides generic access to USB devices)
 import usb # Mac/Linux (pyusb, a Python library that provides easy access to USB devices)
 
 # Project config settings (for microphone array, etc.)
 # If the script is run directly, it cannot natively access the config module; adjustment to the import path is needed to include the parent directory
-if not __name__.startswith("robotssl"):
+if not __name__.startswith("robot_ssl"):
     if __name__ == "__main__":
         import sys
         from pathlib import Path
@@ -25,7 +24,7 @@ if not __name__.startswith("robotssl"):
         sys.path.insert(0, str(parent_dir))
 
     # Now import normally
-    from config import AppConfig 
+    from config import AppConfig
 else:
     from robot_ssl.config import AppConfig
 
@@ -41,6 +40,11 @@ class reSpeaker:
     """Read or write XVF3800 control parameters over USB vendor transfers."""
 
     TIMEOUT = 10_000 # USB timeout - 10 seconds
+    
+    
+    @property
+    def readjusted_angle(self):
+        return ((doa_angle - 360) if (isinstance((doa_angle := self.getDOAValue()["doa_angle"]), (int, float)) and doa_angle > 180) else doa_angle)
     
     
     def __init__(self, dev, config: AppConfig):
@@ -115,7 +119,7 @@ class reSpeaker:
 
         Notes:
             The device documentation does not clearly specify write-only
-            parameter read behavior, so this method does not reject those
+            parameter read behaviour, so this method does not reject those
             reads in advance.
 
         Returns:
@@ -171,66 +175,100 @@ class reSpeaker:
         return {"doa_angle": doa_response[0] if doa_response else None, 
                 "speech_active": doa_response[1] if doa_response and len(doa_response) > 1 else None}
 
+class reSpeakerManager:
+    dev: reSpeaker | None = None
+    
+    def __init__(self, vid=0x2886, pid=0x001A, config=AppConfig()) -> None:
+        """Read and print microphone firmware and direction-of-arrival values.
 
-def find(vid=0x2886, pid=0x001A):
-    """Find the XVF3800 by USB vendor/product ID.
-
-    Parameters:
-        * vid : USB vendor ID for which to search (defaults to manufacturer-spec'd vendor ID).
-        * pid : USB product ID for which to search (defaults to manufacturer-spec'd product ID).
-
-    Returns:
-        A wrapper around the discovered USB device.
-
-    Raises:
-        RuntimeError: If no matching USB device is found.
-    """
-    if sys.platform.startswith("win"):
-        dev = libusb_package.find(idVendor=vid, idProduct=pid)
-    else:
-        dev = usb.core.find(idVendor=vid, idProduct=pid)
-    if not dev:
-        raise RuntimeError("Device not found")
-    #print(dev.is_kernel_driver_active(0))
-    # if dev.is_kernel_driver_active(0):
-    #     dev.detach_kernel_driver(0)
-    # usb.util.claim_interface(dev, 0)
-    return reSpeaker(dev, AppConfig())
-
-
-def main():
-    """Read and print microphone firmware and direction-of-arrival values.
-
-    Returns:
-        None.
-    """
-    try:
-        dev = find()
-        print("Device found" if dev else "No device found")
-        
-        print(f"VERSION: {dev.read('VERSION')}")
-        
+        Returns:
+            None.
+        """
         try:
-            while True:
-                result = dev.getDOAValue()
-                
-                print(f"SPEECH_DETECTED: {result["speech_active"]}, DOA_VALUE: {result["doa_angle"]}")
-                
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            print("Interrupt - closing naturally...")
+            self.dev = self.find(vid, pid, config)
+            print("Device found" if self.dev else "No device found")
         except Exception as e:
             print(f"Error: {e}")
             print(traceback.format_exc())
-        finally:
-            if 'dev' in locals():
-                dev.close()
-                print("Device closed")
-    except Exception as e:
-        print(f"Error: {e}")
-        print(traceback.format_exc())
-    finally:
-        dev.close() if 'dev' in locals() and type(dev).__name__ == 'reSpeaker' else None
+            if self.dev is not None: self.dev.close()
+        
+        return
+    
+    def find(self, vid=0x2886, pid=0x001A, config=AppConfig()):
+        """Find the XVF3800 by USB vendor/product ID.
+
+        Parameters:
+            * vid : USB vendor ID for which to search (defaults to manufacturer-spec'd vendor ID).
+            * pid : USB product ID for which to search (defaults to manufacturer-spec'd product ID).
+
+        Returns:
+            A wrapper around the discovered USB device.
+
+        Raises:
+            RuntimeError: If no matching USB device is found.
+        """
+        if sys.platform.startswith("win"):
+            dev = libusb_package.find(idVendor=vid, idProduct=pid)
+        else:
+            dev = usb.core.find(idVendor=vid, idProduct=pid)
+        if not dev:
+            raise RuntimeError("Device not found")
+        #print(dev.is_kernel_driver_active(0))
+        # if dev.is_kernel_driver_active(0):
+        #     dev.detach_kernel_driver(0)
+        # usb.util.claim_interface(dev, 0)
+        
+        return reSpeaker(dev, config)
+    
+    def demo(self):
+        """Runs an example program to demonstrate basic interfacing behaviour.
+        
+        Returns:
+            None.
+        """
+        if self.dev is not None:
+            print(f"VERSION: {self.dev.read('VERSION')}")
+            
+            try:
+                while True:
+                    result = self.dev.getDOAValue()
+                    
+                    print(f"SPEECH_DETECTED: {result["speech_active"]}, DOA_VALUE: {((doa_angle - 360) if (isinstance((doa_angle := result["doa_angle"]), (int, float)) and doa_angle > 180) else doa_angle)}")
+                    
+                    time.sleep(0.1)
+            except KeyboardInterrupt:
+                print("Interrupt - closing naturally...")
+            except Exception as e:
+                print(f"Error: {e}")
+                print(traceback.format_exc())
+            finally:
+                if self.dev is not None:
+                    self.dev.close()
+                    print("Device closed")
+        else:
+            print("XVF3800 interface has not been successfully initialised!")
+    
+    def close(self):
+        """Closes the manager's reSpeaker interface if it has one.
+        
+        Returns:
+            None.
+        """
+        if self.dev is not None:
+            self.dev.close()
+            print("Device closed")
+        
+        return
+
+
+def main():
+    """Loads the manager and runs its demo.
+    
+    Returns:
+        None.
+    """
+    manager = reSpeakerManager()
+    manager.demo()
     
     return
 

@@ -5,7 +5,7 @@ import numpy as np
 
 
 @dataclass
-class LocalizationResult:
+class LocalisationResult:
     """Azimuth estimate, relative confidence, and scores for tested directions."""
 
     azimuth_degrees: float
@@ -13,7 +13,7 @@ class LocalizationResult:
     scores: np.ndarray
 
 # Note: This should be replaced with the reSpeaker XVF3800's DoA detection
-class SRPPHATLocalizer:
+class SRPPHATLocaliser:
     """Estimate horizontal direction of arrival using phase-normalised cross spectra.
 
     Coordinate convention: x is robot-forward, y is robot-left; 0 degrees is
@@ -59,15 +59,15 @@ class SRPPHATLocalizer:
             for j in range(i + 1, len(self.positions))
         ]
 
-    def localize(self, frame: np.ndarray) -> LocalizationResult | None:
-        """Estimate source azimuth from one synchronized multichannel frame.
+    def localise(self, frame: np.ndarray) -> LocalisationResult | None:
+        """Estimate source azimuth from one synchronised multichannel frame.
 
         Parameters:
             * frame : Audio samples shaped as
                 ``(sample_count, microphone_count)``.
 
         Returns:
-            A localization result, or ``None`` if the frame is unusable or the
+            A localisation result, or ``None`` if the frame is unusable or the
             array has fewer than two microphones.
         """
         data = np.asarray(frame, dtype=np.float64)
@@ -75,13 +75,13 @@ class SRPPHATLocalizer:
             return None
         if len(self.positions) < 2:
             return None
-        centered = data - np.mean(data, axis=0, keepdims=True)
-        energy = float(np.mean(centered * centered))
+        centred = data - np.mean(data, axis=0, keepdims=True)
+        energy = float(np.mean(centred * centred))
         if energy < 1e-7:
             return None
 
         window = np.hanning(data.shape[0])[:, None]
-        spectra = np.fft.rfft(centered * window, axis=0)
+        spectra = np.fft.rfft(centred * window, axis=0)
         frequencies = np.fft.rfftfreq(data.shape[0], d=1.0 / self.sample_rate)
         band = (frequencies >= self.min_frequency_hz) & (frequencies <= min(self.max_frequency_hz, self.sample_rate / 2 - 1))
         if not np.any(band):
@@ -115,7 +115,7 @@ class SRPPHATLocalizer:
         baseline = float(np.mean(total_scores))
         peak = float(total_scores[best_index])
         confidence = float(np.clip((peak - baseline) / max(abs(peak), 1e-6), 0.0, 1.0))
-        return LocalizationResult(
+        return LocalisationResult(
             azimuth_degrees=float(self.angles[best_index]),
             confidence=confidence,
             scores=total_scores,

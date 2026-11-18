@@ -1,6 +1,6 @@
 # RobotSSL - Sound Source Localisation & Attention (Python)
 
-RobotSSL is a prototype robot audio-perception application. It captures synchronized multichannel audio, estimates a speaker's direction, detects speech and wake words, transcribes utterances, tracks short attention sessions, and records event metadata. It includes a Tkinter dashboard and experimental interfaces for robot communication.
+RobotSSL is a prototype robot audio-perception application. It captures synchronised multichannel audio, estimates a speaker's direction, detects speech and wake words, transcribes utterances, tracks short attention sessions, and records event metadata. It includes a Tkinter dashboard and experimental interfaces for robot communication.
 
 Wake-word detection and speech-to-text are optional dependencies, but are **strongly recommended** for normal use: without them, the application loses acoustic wake-word detection or transcription-based interaction. The core audio capture, speech segmentation, and direction-estimation pipeline can run without either library.
 
@@ -21,12 +21,12 @@ Microphone input
   -> SQLite event record, dashboard update, and robot-interface commands
 ```
 
-The XVF3800 profile expects six synchronized input channels at 16 kHz: channel 0 is ASR, channel 1 is the array sum, and channels 2-5 are the four raw microphones. The current pipeline uses the raw microphones for detection, localization, and transcription (after beamforming); it splits out the ASR and sum channels but does not yet feed them into later processing. The DoA estimator uses the configured microphone geometry, not the XVF3800's on-device DoA.
+The XVF3800 profile expects six synchronised input channels at 16 kHz: channel 0 is ASR, channel 1 is the array sum, and channels 2-5 are the four raw microphones. The current pipeline uses the raw microphones for detection, localisation, and transcription (after beamforming); it splits out the ASR and sum channels but does not yet feed them into later processing. The DoA estimator uses the configured microphone geometry, not the XVF3800's on-device DoA.
 
 ## Requirements and installation
 
 - Python 3.14 or later.
-- A synchronized multichannel microphone array for useful DoA estimates. Independent USB microphones may have unrelated clocks and latency.
+- A synchronised multichannel microphone array for useful DoA estimates. Independent USB microphones may have unrelated clocks and latency.
 - Microphone positions measured in metres and ordered to match the raw microphone channels.
 
 Create and activate a virtual environment, then install the core dependencies:
@@ -92,17 +92,17 @@ python main.py --demo
 
 The synthetic `--demo` checks DoA estimation without opening an audio stream. `--keep-chat-logs` preserves previously stored event records; by default the application clears stored events when it starts.
 
-If wake-word detection is disabled, transcript phrase matching can still recognize phrases such as “hey robot” when STT is available. If STT is disabled too, there are no transcript-based wake phrases.
+If wake-word detection is disabled, transcript phrase matching can still recognise phrases such as “hey robot” when STT is available. If STT is disabled too, there are no transcript-based wake phrases.
 
 ## Robot interface
 
-Robot communication is experimental. `robot_ssl/interfaces/robot.py` opens a TCP socket using `robot_host` and `robot_port` from `AppConfig` and sends robot alertness and rotation commands. It is not a ROS interface and does not directly use a robot SDK. A compatible server must be listening at the configured address. Review and adapt the protocol, coordinate conventions, limits, and safety behavior for the target robot before connecting hardware.
+Robot communication is experimental. `robot_ssl/interfaces/robot.py` opens a TCP socket using `robot_host` and `robot_port` from `AppConfig` and sends robot alertness and rotation commands. It is not a ROS interface and does not directly use a robot SDK. A compatible server must be listening at the configured address. Review and adapt the protocol, coordinate conventions, limits, and safety behaviour for the target robot before connecting hardware.
 
 The project also contains `robot_ssl/interfaces/xvf_usb.py` for XVF3800 control transfers over USB. It is not currently used by the main audio pipeline.
 
 ## Optional accent-model training
 
-The application reports an unknown accent unless a classifier is supplied with `--accent-model`. The classifier must be a `joblib`-serialized scikit-learn-compatible model trained on five features in this order:
+The application reports an unknown accent unless a classifier is supplied with `--accent-model`. The classifier must be a `joblib`-serialised scikit-learn-compatible model trained on five features in this order:
 
 1. Median pitch in Hz (0 when unavailable)
 2. RMS in dBFS
@@ -124,7 +124,7 @@ The included acoustic features and baseline speaker-continuity score are not rel
 - SQLite stores transcripts and event metadata (direction, confidence, wake-word/addressing decisions, language, timing, and voice-feature summaries). Raw microphone audio is processed in memory and is not stored by default.
 - Stored events are cleared at startup unless `--keep-chat-logs` is provided. Protect the database and establish appropriate consent, retention, and deletion policies.
 - The VAD and delay-and-sum beamformer are baselines. Room reverberation, wind, clipping, poor calibration, array geometry, and robot noise can reduce accuracy.
-- DoA assumes synchronized microphones and far-field speech. A linear two-microphone array can have front/back ambiguity.
+- DoA assumes synchronised microphones and far-field speech. A linear two-microphone array can have front/back ambiguity.
 - Robot angle conventions, movement limits, emergency stops, and hardware safety interlocks must be implemented and validated for the target platform.
 - Accent and speaker-continuity heuristics are not biometric speaker verification.
 
@@ -138,7 +138,7 @@ robot_ssl/
   config_ext/extMicIndices.py    # Named input-channel indices
   audio/
     processing.py                # Filtering, features, energy VAD and segmentation
-    localization.py              # SRP-PHAT-style azimuth estimator
+    localisation.py              # SRP-PHAT-style azimuth estimator
     beamformer.py                # Direction-steered delay-and-sum beamforming
     wakeword.py                  # Optional openWakeWord adapter
     stt.py                       # Optional faster-whisper adapter

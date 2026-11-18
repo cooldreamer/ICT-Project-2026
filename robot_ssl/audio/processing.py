@@ -44,7 +44,7 @@ class AudioCleaner:
         return
 
     def clean(self, frame: np.ndarray) -> np.ndarray:
-        """Sanitize, clip, and band-pass filter one audio frame.
+        """Sanitise, clip, and band-pass filter one audio frame.
 
         Parameters:
             * frame : Mono or multichannel audio frame to clean.
@@ -86,10 +86,10 @@ def extract_frame_features(frame: np.ndarray, sample_rate: int) -> FrameFeatures
     # Use all channels for loudness so phase cancellation in a naïve mono mix
     # does not suppress VAD when the array mics have different arrival times.
     rms = float(np.sqrt(np.mean(np.square(data, dtype=np.float64)) + 1e-12))
-    centered = mono - float(np.mean(mono))
-    zcr = float(np.mean(np.signbit(centered[1:]) != np.signbit(centered[:-1]))) if mono.size > 1 else 0.0
-    spectrum = np.abs(np.fft.rfft(centered * np.hanning(len(centered))))
-    frequencies = np.fft.rfftfreq(len(centered), d=1.0 / sample_rate)
+    centred = mono - float(np.mean(mono))
+    zcr = float(np.mean(np.signbit(centred[1:]) != np.signbit(centred[:-1]))) if mono.size > 1 else 0.0
+    spectrum = np.abs(np.fft.rfft(centred * np.hanning(len(centred))))
+    frequencies = np.fft.rfftfreq(len(centred), d=1.0 / sample_rate)
     mag_sum = float(spectrum.sum())
     centroid = float(np.dot(frequencies, spectrum) / mag_sum) if mag_sum > 1e-12 else 0.0
     clipped = float(np.mean(np.abs(data) >= 0.999))
@@ -119,8 +119,10 @@ class SpeechSegmenter:
         pre_roll_seconds: float = 0.24,
         min_speech_seconds: float = 0.24,
         max_segment_seconds: float = 12.0,
+        
+        doa_source: str = "none"
     ) -> None:
-        """Initialize adaptive energy-VAD and utterance-boundary settings.
+        """Initialise adaptive energy-VAD and utterance-boundary settings.
 
         Parameters:
             * sample_rate : Audio sample rate in hertz.
@@ -153,6 +155,8 @@ class SpeechSegmenter:
         self.silence_frames = 0
         self.speech_frames = 0
         self.segment_start = 0.0
+        
+        self.doa_source: str = doa_source
 
     def process(
         self,
@@ -162,6 +166,7 @@ class SpeechSegmenter:
         wakeword_detected: bool,
         doa_confidence: float | None = None,
         now: float | None = None,
+        doa_source: str = "none"
     ) -> AudioSegment | None:
         """Accumulate frames and produce an utterance when endpointing completes.
 
@@ -180,6 +185,8 @@ class SpeechSegmenter:
         now = time.monotonic() if now is None else now
         speech_threshold = max(self.min_rms, self.noise_rms * self.noise_multiplier)
         is_speech = rms >= speech_threshold
+        
+        self.doa_source = doa_source
 
         # Update the noise floor only when the frame appears non-speech.
         if not is_speech:
@@ -223,6 +230,9 @@ class SpeechSegmenter:
                         wakeword_detected=self.wakeword_seen,
                         start_monotonic=self.segment_start,
                         end_monotonic=now,
+                        sample_rate=self.sample_rate,
+                        
+                        doa_source=self.doa_source
                     )
                 self.active = False
                 self.frames = []

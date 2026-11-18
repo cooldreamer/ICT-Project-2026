@@ -64,9 +64,9 @@ def extract_voice_traits(audio: np.ndarray, sample_rate: int = 16_000) -> VoiceT
     if signal.size == 0:
         return VoiceTraits()
     rms = float(np.sqrt(np.mean(np.square(signal, dtype=np.float64)) + 1e-12))
-    centered = signal - float(signal.mean())
-    spectrum = np.abs(np.fft.rfft(centered * np.hanning(len(centered))))
-    freqs = np.fft.rfftfreq(len(centered), d=1.0 / sample_rate)
+    centred = signal - float(signal.mean())
+    spectrum = np.abs(np.fft.rfft(centred * np.hanning(len(centred))))
+    freqs = np.fft.rfftfreq(len(centred), d=1.0 / sample_rate)
     total = float(spectrum.sum())
     centroid = float(np.dot(freqs, spectrum) / total) if total > 1e-12 else None
     cumulative = np.cumsum(spectrum)
@@ -74,7 +74,7 @@ def extract_voice_traits(audio: np.ndarray, sample_rate: int = 16_000) -> VoiceT
     if total > 1e-12:
         roll_index = min(int(np.searchsorted(cumulative, 0.85 * total)), len(freqs) - 1)
         rolloff = float(freqs[roll_index])
-    zcr = float(np.mean(np.signbit(centered[1:]) != np.signbit(centered[:-1]))) if len(centered) > 1 else 0.0
+    zcr = float(np.mean(np.signbit(centred[1:]) != np.signbit(centred[:-1]))) if len(centred) > 1 else 0.0
     return VoiceTraits(
         pitch_median_hz=_estimate_pitch_median(signal, sample_rate),
         rms_dbfs=20.0 * float(np.log10(max(rms, 1e-6))),
@@ -94,10 +94,10 @@ class AccentClassifier:
     """
 
     def __init__(self, model_path: str | None = None) -> None:
-        """Load an optional joblib-serialized classifier from disk.
+        """Load an optional joblib-serialised classifier from disk.
 
         Parameters:
-            * model_path : Optional path to the serialized classifier.
+            * model_path : Optional path to the serialised classifier.
 
         Returns:
             None.

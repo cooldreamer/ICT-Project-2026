@@ -8,7 +8,7 @@ class HealthMonitor:
     """Track recent audio throughput and cumulative runtime health counters."""
 
     def __init__(self, window_seconds: float = 10.0) -> None:
-        """Initialize the rolling frame-rate window and runtime counters.
+        """Initialise the rolling frame-rate window and runtime counters.
 
         Parameters:
             * window_seconds : Time span used to calculate recent frame rate.

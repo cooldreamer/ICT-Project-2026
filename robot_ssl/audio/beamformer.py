@@ -12,7 +12,7 @@ class DelayAndSumBeamformer:
         sample_rate: int = 16_000,
         speed_of_sound_m_s: float = 343.0,
     ) -> None:
-        """Initialize the beamformer with microphone geometry and audio parameters.
+        """Initialise the beamformer with microphone geometry and audio parameters.
 
         Parameters:
             * microphone_positions_m : Microphone coordinates in metres, ordered

@@ -7,7 +7,7 @@ This is an educational baseline, not a reliable accent-recognition system. Use o
 consented data, prevent speaker leakage across splits, and evaluate on speakers that
 were not used for training before using results in a robot. The script reports its
 hold-out evaluation before refitting the final model on all available rows; the
-random utterance split can still overstate generalization across speakers.
+random utterance split can still overstate generalisation across speakers.
 """
 from __future__ import annotations
 import argparse

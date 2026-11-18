@@ -44,7 +44,7 @@ class AppConfig:
     is enabled. Otherwise, underscored fields provide the defaults. Settings
     from ``robot_ssl/config.json`` are applied after construction and override
     constructor-provided values with matching names. Device-dependent
-    properties are installed dynamically during initialization.
+    properties are installed dynamically during initialisation.
 
     Microphone coordinates are example values and must be replaced with
     measurements for the physical array. Non-16-kHz audio is not resampled;

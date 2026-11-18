@@ -12,7 +12,7 @@ import numpy as np
 
 from robot_ssl.app import RobotAudioApp
 from robot_ssl.config import AppConfig
-from robot_ssl.audio.localization import SRPPHATLocalizer
+from robot_ssl.audio.localisation import SRPPHATLocaliser
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stt-model", default="base", help="faster-whisper model size/path (e.g. tiny, base, small)")
     parser.add_argument("--stt-device", default="cpu", choices=("cpu", "cuda"), help="faster-whisper inference device")
     parser.add_argument("--stt-compute-type", default="int8", help="faster-whisper compute type, e.g. int8 or float16")
-    parser.add_argument("--accent-model", help="Optional joblib-serialized scikit-learn-compatible accent classifier")
+    parser.add_argument("--accent-model", help="Optional joblib-serialised scikit-learn-compatible accent classifier")
     parser.add_argument("--robot-endpoint", help="Optional HTTP endpoint that accepts generic JSON robot commands")
     parser.add_argument("--server-endpoint", help="Optional HTTP endpoint to receive perception events")
     parser.add_argument("--database", default="data/robot_audio.sqlite3", help="SQLite database path")
@@ -123,9 +123,9 @@ def run_doa_demo(positions: tuple[tuple[float, float], ...]) -> int:
         shifted_spectrum = source_spectrum * np.exp(-1j * 2.0 * np.pi * frequencies * arrival_delay)
         audio.append(np.fft.irfft(shifted_spectrum, n=n_samples, out=np.empty(n_samples, dtype=np.float32)))
     multichannel = np.column_stack(audio).astype(np.float32)
-    localizer = SRPPHATLocalizer(positions, sample_rate=sample_rate, angle_step_degrees=1.0)
+    localiser = SRPPHATLocaliser(positions, sample_rate=sample_rate, angle_step_degrees=1.0)
     
-    result = localizer.localize(multichannel)
+    result = localiser.localise(multichannel)
     
     if result is None:
         print("DoA demo failed: no usable localisation result")

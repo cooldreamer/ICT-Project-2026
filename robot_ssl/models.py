@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass
 from typing import Any
 import numpy as np
 
+from robot_ssl.config import AppConfig
+
 
 @dataclass
 class VoiceTraits:
@@ -35,6 +37,10 @@ class AudioSegment:
     wakeword_detected: bool
     start_monotonic: float
     end_monotonic: float
+    
+    sample_rate: int = 16_000
+    
+    doa_source: str = "none"
 
     @property
     def duration_seconds(self) -> float:
@@ -43,4 +49,4 @@ class AudioSegment:
         Returns:
             Segment duration in seconds.
         """
-        return float(self.samples.shape[0]) / 16_000.0
+        return float(self.samples.shape[0]) / self.sample_rate

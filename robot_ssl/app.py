@@ -12,12 +12,13 @@ from numpy.typing import NDArray
 from robot_ssl.attention import AttentionMaintenanceSystem
 from robot_ssl.audio.beamformer import DelayAndSumBeamformer
 from robot_ssl.audio.characteristics import AccentClassifier, extract_voice_traits
-from robot_ssl.audio.localization import SRPPHATLocalizer
+from robot_ssl.audio.localisation import SRPPHATLocaliser
 from robot_ssl.audio.processing import AudioCleaner, SpeechSegmenter, extract_frame_features
 from robot_ssl.audio.stt import SpeechToText
 from robot_ssl.audio.wakeword import WakeWordDetector
 from robot_ssl.config import AppConfig
 from robot_ssl.interfaces.robot import RobotMovementInterface
+from robot_ssl.interfaces.xvf_usb import reSpeakerManager
 from robot_ssl.models import AudioSegment, VoiceTraits # VoiceTraits is a settings class which does not seem to be being used, hmm...
 from robot_ssl.services.health import HealthMonitor
 from robot_ssl.services.storage import DatabaseStore
@@ -30,22 +31,27 @@ def circular_mean_degrees(angles: list[float]) -> float | None:
         * angles : Angles in degrees to average.
 
     Returns:
-        The mean angle in degrees, or ``None`` if ``angles`` is empty.
+        The mean angle in degrees, or `None` if `angles` is empty.
     """
-    if not angles:
-        return None
-    radians = np.deg2rad(np.asarray(angles, dtype=np.float64))
-    sin_mean = float(np.mean(np.sin(radians)))
-    cos_mean = float(np.mean(np.cos(radians)))
-    if abs(sin_mean) < 1e-9 and abs(cos_mean) < 1e-9:
-        return float(angles[-1])
-    return float(np.rad2deg(np.arctan2(sin_mean, cos_mean)))
+    meanAngle = None
+    
+    if angles:
+        radians = np.deg2rad(np.asarray(angles, dtype=np.float64))
+        
+        sin_mean = float(np.mean(np.sin(radians)))
+        cos_mean = float(np.mean(np.cos(radians)))
+        
+        if abs(sin_mean) < 1e-9 and abs(cos_mean) < 1e-9:
+            meanAngle = float(angles[-1])
+        else:
+            meanAngle = float(np.rad2deg(np.arctan2(sin_mean, cos_mean)))
+    return meanAngle
 
 
 class RobotAudioApp:
     """Coordinate audio capture, speech processing, attention, and integrations.
 
-    Audio currently enters through ``sounddevice``. A device-specific XVF3800
+    Audio currently enters through `sounddevice`. A device-specific XVF3800
     interface and explicit channel routing for DoA and wake-word processing are
     future integration work.
     """
@@ -58,14 +64,14 @@ class RobotAudioApp:
         device: int | str | None = None,
         wake_phrases: tuple[str, ...] = ("hey robot", "hello robot", "robot"),
     ) -> None:
-        """Initialize the pipeline components from configuration and options.
+        """Initialise the pipeline components from configuration and options.
 
         Parameters:
             * config : Validated application settings.
             * event_queue : Optional queue for UI events and telemetry.
             * stop_event : Optional event used to request pipeline shutdown.
             * device : Optional sounddevice input device index or name.
-            * wake_phrases : Transcript phrases recognized as wake words.
+            * wake_phrases : Transcript phrases recognised as wake words.
 
         Returns:
             None.
@@ -78,7 +84,7 @@ class RobotAudioApp:
         self.wake_phrases = tuple(p.lower().strip() for p in wake_phrases if p.strip())
         self.cleaner = AudioCleaner(config.sample_rate, config.raw_channels)
         
-        self.localizer = SRPPHATLocalizer(
+        self.localiser = SRPPHATLocaliser(
             config.microphone_positions_m,
             sample_rate=config.sample_rate,
             speed_of_sound_m_s=config.speed_of_sound_m_s,
@@ -113,6 +119,10 @@ class RobotAudioApp:
             angle_tolerance_degrees=config.subject_angle_tolerance_degrees,
         )
         
+        self.xvf_manager = None
+        if config.use_xvf3800_mic_model:
+            self.xvf_manager = reSpeakerManager(config = config)
+        
         self.robot: RobotMovementInterface = RobotMovementInterface(config.robot_host, config.robot_port)
         
         
@@ -130,7 +140,8 @@ class RobotAudioApp:
         self.last_ui_publish = 0.0
         
         return
-
+    
+    
     def _publish(self, event: dict[str, Any]) -> bool:
         """Publish an event to the optional UI queue without blocking capture.
 
@@ -156,7 +167,8 @@ class RobotAudioApp:
                 except (queue.Empty, queue.Full):
                     pass
         return published
-
+    
+    
     def _hasTextWakeword(self, text: str) -> bool:
         """Check whether transcript text contains a configured wake phrase.
 
@@ -191,10 +203,8 @@ class RobotAudioApp:
         mics_frame = frame_data[:, self.config.microphone_channel_indices.raw]
         
         return (asr_frame, sum_frame, mics_frame)
-
-
-    # To Do: 
-    # * Replace direct sounddevice interface with specialised reSpeaker XVF3800 interface library
+    
+    
     def run(self) -> None:
         """Capture microphone frames and enqueue completed speech segments.
 
@@ -266,27 +276,46 @@ class RobotAudioApp:
                         
                         doa_angle: float | None = None
                         doa_confidence: float | None = None
-                        # Avoid spending CPU localising very quiet frames.
+                        
+                        doa_method = "none"
+                        
                         # print(self.config.raw_channels)
                         # print(f"{features.rms:.8f}")
                         # print(f"{self.config.vad_min_rms:.8f}")
                         # print()
                         
+                        # Avoid spending CPU localising very quiet frames.
                         if self.config.raw_channels >= 2 and features.rms >= self.config.vad_min_rms * 0.5:
-                            result = self.localizer.localize(cleaned)
+                            result = self.localiser.localise(cleaned)
                             if result is not None:
                                 doa_angle = result.azimuth_degrees
                                 doa_confidence = result.confidence
                                 self.last_azimuth = doa_angle
                                 self.last_doa_confidence = doa_confidence
+                        
+                        if doa_angle is not None:
+                            doa_method = "localise"
+                                                    
+                        xvf_angle_data = None # should be deprecated or appended into its own list
+                        if self.config.use_xvf3800_mic_model:
+                            assert self.xvf_manager is not None
+                            if self.xvf_manager.dev:
+                                xvf_angle_data = self.xvf_manager.dev.readjusted_angle
 
+                                if doa_angle is None:
+                                    doa_angle = xvf_angle_data
+                                    doa_method = "xvf"
+                                    #logging.info("DoA algorithm did not detect DoA - using XVF DoA data")
+                        
                         segment = self.segmenter.process(
                             cleaned,
                             rms=features.rms,
                             doa_angle=doa_angle,
                             wakeword_detected=wakeword_detected,
                             doa_confidence=doa_confidence,
+                            doa_source=doa_method
                         )
+                        #print("DoA thing:",doa_angle) # good for testing but spams the hell out of the console
                         if segment is not None:
                             try:
                                 self.segment_queue.put_nowait(segment)
@@ -326,7 +355,8 @@ class RobotAudioApp:
                 self.robot.close()
         
         return
-
+    
+    
     def _segmentWorker(self) -> None:
         """Load optional speech models and process queued segments until shutdown.
 
@@ -358,12 +388,13 @@ class RobotAudioApp:
                 self._publish({"type": "error", "message": "Could not process one speech segment; see log for details."})
             finally:
                 self.segment_queue.task_done()
-
+    
+    
     def _handleSegment(self, segment: AudioSegment, stt: SpeechToText, accent_classifier: AccentClassifier) -> None:
-        """Analyze an utterance, update attention, and publish its event.
+        """Analyse an utterance, update attention, and publish its event.
 
         Parameters:
-            * segment : Captured utterance with audio and localization data.
+            * segment : Captured utterance with audio and localisation data.
             * stt : Speech-to-text backend used for transcription.
             * accent_classifier : Optional classifier for acoustic traits.
 
@@ -371,6 +402,9 @@ class RobotAudioApp:
             None.
         """
         angle = circular_mean_degrees(segment.doa_angles_degrees)
+        print(f"""Degree flipping test: 
+Before: {segment.doa_angles_degrees}
+After: {angle} ({segment.doa_source})""")
         confidence = float(np.mean(segment.doa_confidences)) if segment.doa_confidences else 0.0
         if confidence < 0.02:
             confidence = 0.0
@@ -413,6 +447,7 @@ class RobotAudioApp:
             "language": language,
             "azimuth_degrees": angle,
             "doa_confidence": confidence,
+            "doa_method": segment.doa_source,
             "wakeword_detected": wakeword_confirmed,
             "addressed_robot": addressed,
             "attention_score": score,
