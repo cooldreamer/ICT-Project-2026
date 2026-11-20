@@ -6,4 +6,4 @@
 * Complete adding comments to main.py
 * Add json processing for mic positions in config file
 * Send more data points to be more compatible with ROS 2(?)
-* Use faster_whisper's `word_timestamps` to find start and end times of words and confidence scores, helping both point #3 and #9
+* Use faster_whisper's `word_timestamps` to find start and end times of words and confidence scores, helping both main point #3 and #9
