@@ -2,8 +2,9 @@
   ** Move try-excepts for imports to top and readjust program accordingly
 * Add indicator that STT model has not loaded before/when faster-whisper has not loaded (e.g. grey out utterance box)
 * Fix STT transcribing wake word instances incorrectly, even when the wake word LLM picks it up (usually correctly)
-* Complete adding comments to extMicIndices.py
-* Complete adding comments to main.py
+* Complete adding comments to `extMicIndices.py`
+* Complete adding comments to `main.py`
 * Add json processing for mic positions in config file
 * Send more data points to be more compatible with ROS 2(?)
 * Use faster_whisper's `word_timestamps` to find start and end times of words and confidence scores, helping both main point #3 and #9
+* Improve example listener program (`robot_gauge.py`) GUI to support switching gauge modes (absolute orientation vs. relative rotation) and include an alertness indicator
