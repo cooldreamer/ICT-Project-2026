@@ -4,6 +4,7 @@ import threading
 import json
 import math
 import socket
+import time
 
 # --------------------------------------------------
 # Configuration
@@ -36,79 +37,116 @@ TCP_PORT = 5004
 heading = 0.0
 
 
-# Serial Monitor
-def serial_thread():
+# Message Handling
+def process_message(line: str | bytes, source: str) -> None:
     global heading
 
-    ser = serial.Serial(
-        SERIAL_PORT,
-        BAUDRATE,
-        timeout=1
-    )
+    try:
+        data = json.loads(line)
+        if isinstance(data, dict):
+            if "turnby" in data:
+                turnby = float(data["turnby"])
+                
+                if not math.isfinite(turnby):
+                    raise ValueError("turnby must be finite")
+                
+                heading = (heading + turnby) % 360
+                print("Heading =", heading)
+                
+                root.after(0, draw_gauge)
+        else:
+            print(f"Ignoring non-object {source} message")
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        print(f"Ignoring invalid {source} message: {exc}")
+    
+    return
+
+
+# Serial Monitor
+def serial_thread():
+    is_connected: bool | None = None
 
     while True:
-
         try:
-            line = ser.readline().decode().strip()
-
-            if not line:
-                continue
-
-            data = json.loads(line)
-
-            if "turnby" in data:
-
-                heading = float(data["turnby"]) # temporary set to relative direction instead of absolute
-                heading %= 360
-                print("Heading =", heading)
-
-                root.after(0, draw_gauge)
-
-        except Exception as e:
-            print(e)
+            with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=1) as ser:
+                if not is_connected:
+                    print(f"Connected to serial port {SERIAL_PORT}")
+                is_connected = True
+                
+                while True:
+                    line = ser.readline()
+                    if line:
+                        process_message(line, "serial")
+        except (serial.SerialException, OSError) as exc:
+            if is_connected is None:
+                print(f"Serial port {SERIAL_PORT} unavailable: {exc}")
+            elif is_connected:
+                print(f"Disconnected from serial port {SERIAL_PORT}: {exc}")
+            is_connected = False
+            
+            time.sleep(1)
+    
+    return
 
 
 def socket_thread():
-    global heading
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((HOST_NAME, TCP_PORT))
+        server.listen()
+        print(f"Listening for connections on {HOST_NAME}:{TCP_PORT}")
 
-    ser = socket.socket()
-    ser.bind((HOST_NAME, TCP_PORT))
-    ser.listen(1)
-
-    conn, addr = ser.accept()
-    
-    try:
         while True:
             try:
-                line = conn.recv(1024)
+                conn, addr = server.accept()
+            except OSError as exc:
+                print(f"Socket listener stopped: {exc}")
+                return
+            
+            # NOTE: This design of connecting to the socket as a file is safer than processing x number of bytes at a time - 
+            # it can, however, only process 1 sender at a time.  If you need the listener to process more than one at a time and are happy to risk sacrificing data integrity, see the commented out code below.
+            print(f"Connected: {addr}")
+            with conn:
+                try:
+                    with conn.makefile("r", encoding="utf-8") as conn_file:
+                        for line in conn_file:
+                            process_message(line, "socket")
+                except OSError as exc:
+                    print(f"Connection {addr} ended with an error: {exc}")
+            print(f"Disconnected: {addr}; waiting for another client")
+    
+    ## Listener code without using file connection
+    # try:
+    #     while True:
+    #         try:
+    #             line = conn.recv(1024)
 
-                if not line:
-                    continue
+    #             if not line:
+    #                 continue
 
-                data = json.loads(line)
+    #             data = json.loads(line)
 
-                if "turnby" in data:
+    #             if "turnby" in data:
 
-                    heading = float(data["turnby"]) # temporary set to relative direction instead of absolute
-                    heading %= 360
-                    print("Heading =", heading)
+    #                 heading = float(data["turnby"]) # temporary set to relative direction instead of absolute
+    #                 heading %= 360
+    #                 print("Heading =", heading)
 
-                    root.after(0, draw_gauge)
+    #                 root.after(0, draw_gauge)
 
-            except Exception as e:
-                print(e)
-                if isinstance(e, KeyboardInterrupt):
-                    raise
-    except KeyboardInterrupt:
-        pass
-    finally:
-        ser.close()
+    #         except Exception as e:
+    #             print(e)
+    #             if isinstance(e, KeyboardInterrupt):
+    #                 raise
+    # except KeyboardInterrupt:
+    #     pass
+    # finally:
+    #     ser.close()
+    
+    return
 
 
-# --------------------------------------------------
 # Gauge Drawing
-# --------------------------------------------------
-
 def draw_gauge():
     canvas.delete("all")
 
@@ -189,4 +227,9 @@ else:
     # TEST
     root.after(1000, test)
 
-root.mainloop()
+try:
+    root.mainloop()
+except KeyboardInterrupt:
+    print("Keyboard interrupt detected - program ending naturally.")
+else:
+    print("Program closed safely.")

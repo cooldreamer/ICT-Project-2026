@@ -124,7 +124,7 @@ class RobotMovementInterface:
         data_sent = False
         if self.socket is not None:
             try:
-                self.socket.sendall(json.dumps(eventData).encode())
+                self.socket.sendall((json.dumps(eventData) + "\n").encode())
             except BrokenPipeError:
                 logging.info("[ROBOT] Listener no longer available; socket connection terminated.")
                 self.socket = None

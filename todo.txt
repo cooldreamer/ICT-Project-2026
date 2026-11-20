@@ -4,7 +4,5 @@
 * Complete adding comments to extMicIndices.py
 * Complete adding comments to main.py
 * Add json processing for mic positions in config file
-* Fix gauge script only working outside repo
-* Fix read method for gauge script so that it can process large amounts of data more reliably
 * Send more data points to be more compatible with ROS 2(?)
 * Use faster_whisper's `word_timestamps` to find start and end times of words and confidence scores, helping both point #3 and #9
