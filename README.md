@@ -1,6 +1,6 @@
-# RobotSSL - Sound Source Localisation & Attention (Python)
+# RobotSSL - Sound Source Localisation & Attention
 
-RobotSSL is a robot audio-perception application.  It captures synchronised multichannel audio, estimates a speaker's direction, detects speech and wake words, transcribes utterances, tracks short attention sessions, and records event metadata.  It includes a Tkinter dashboard and experimental interfaces for robot communication.
+RobotSSL is a Python 3-based robot audio-perception application.  It captures synchronised multichannel audio, estimates a speaker's direction, detects speech and wake words, transcribes utterances, tracks short attention sessions, and records event metadata.  It includes a Tkinter dashboard and experimental interfaces for robot communication.
 
 Wake word detection and speech-to-text are optional dependencies, but are **strongly recommended** for normal use: without them, the application loses acoustic wake word detection or transcription-based interaction.  The core audio capture, speech segmentation, and direction-estimation pipeline can run without either library.
 
